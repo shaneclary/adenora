@@ -1,0 +1,16 @@
+[package]
+name = "adenora-charity"
+description = "GLC Donate and Play fund tracking, project ledger, revenue splits"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+adenora-common = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+sqlx = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+rust_decimal = { workspace = true }

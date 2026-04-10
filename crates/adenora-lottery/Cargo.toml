@@ -1,0 +1,17 @@
+[package]
+name = "adenora-lottery"
+description = "Lottery engine: draws, instant scratch, RNG, multi-country jackpots, Donate and Play"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+adenora-common = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+sqlx = { workspace = true }
+rand = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+rust_decimal = { workspace = true }

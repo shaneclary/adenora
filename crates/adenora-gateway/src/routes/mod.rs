@@ -1,0 +1,13 @@
+pub mod auth;
+pub mod bots;
+pub mod campaigns;
+pub mod charity;
+pub mod gaming;
+pub mod health;
+pub mod kyc;
+pub mod lottery;
+pub mod markets;
+pub mod predict;
+pub mod trading;
+pub mod votes;
+pub mod wallet;

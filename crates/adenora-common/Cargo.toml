@@ -1,0 +1,15 @@
+[package]
+name = "adenora-common"
+description = "Shared types, errors, config, fee calculations, and i18n for Adenora"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+thiserror = { workspace = true }
+rust_decimal = { workspace = true }
+tracing = { workspace = true }
+dotenvy = { workspace = true }

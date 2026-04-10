@@ -1,0 +1,51 @@
+version: "3.8"
+
+# PREVIEW STACK — HTTP only, no TLS, mock data
+# Run: docker compose -f deploy/docker-compose.preview.yml up -d
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: adenora
+      POSTGRES_PASSWORD: adenora_preview
+      POSTGRES_DB: adenora
+    volumes:
+      - pgdata_preview:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U adenora"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  adenora:
+    image: adenora:latest
+    restart: always
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      DATABASE_URL: postgres://adenora:adenora_preview@db/adenora
+      JWT_SECRET: preview_secret_not_for_production_use_at_all
+      JWT_EXPIRY_HOURS: "24"
+      REFRESH_EXPIRY_DAYS: "30"
+      ADENORA_BIND: "0.0.0.0:8080"
+      RUST_LOG: info
+      ADENORA_CORS_ORIGINS: "http://5.78.182.190"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - ./Caddyfile.preview:/etc/caddy/Caddyfile
+      - ../web/build:/srv/web
+    depends_on:
+      - adenora
+
+volumes:
+  pgdata_preview:

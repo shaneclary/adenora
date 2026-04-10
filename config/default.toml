@@ -1,0 +1,30 @@
+[server]
+bind = "0.0.0.0:8080"
+cors_origins = ["*"]
+
+[database]
+url = "postgres://adenora:adenora@localhost/adenora"
+max_connections = 10
+
+[auth]
+jwt_expiry_hours = 24
+refresh_expiry_days = 30
+min_age = 21
+
+[trading]
+batch_interval_ms = 500
+max_contracts_per_order = 1000
+min_price_cents = 1
+max_price_cents = 99
+dispute_window_hours = 48
+oracle_min_sources = 3
+
+[lottery]
+default_winner_pct = 50
+max_ticket_price_cents = 10000
+free_entry_after_losses = 5
+
+[bot_arena]
+enabled = true
+max_bots_per_user = 10
+bot_name_max_length = 32

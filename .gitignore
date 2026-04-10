@@ -1,0 +1,33 @@
+# Build
+target/
+*.exe
+web/build/
+web/.svelte-kit/
+web/node_modules/
+
+# Data
+*.db
+*.db-shm
+*.db-wal
+*.log
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# Private documents
+*.pdf
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Backups
+deploy/backups/

@@ -1,0 +1,16 @@
+[package]
+name = "adenora-orderbook"
+description = "Central limit order book with batch auction (people mode) and continuous matching (bot mode)"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+adenora-common = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+rust_decimal = { workspace = true }
+tokio = { workspace = true }

@@ -1,0 +1,75 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/adenora-common",
+    "crates/adenora-users",
+    "crates/adenora-orderbook",
+    "crates/adenora-markets",
+    "crates/adenora-oracle",
+    "crates/adenora-lottery",
+    "crates/adenora-gaming",
+    "crates/adenora-botarena",
+    "crates/adenora-charity",
+    "crates/adenora-gateway",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Proprietary"
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Web framework
+axum = { version = "0.7", features = ["ws", "macros"] }
+tower = { version = "0.4", features = ["full"] }
+tower-http = { version = "0.5", features = ["cors", "compression-gzip", "trace"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Database
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid", "migrate", "rust_decimal"] }
+
+# Auth
+jsonwebtoken = "9"
+argon2 = "0.5"
+
+# Crypto & randomness
+rand = "0.8"
+uuid = { version = "1", features = ["v4", "serde"] }
+sha2 = "0.10"
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Error handling
+anyhow = "1"
+thiserror = "1"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Config
+dotenvy = "0.15"
+
+# HTTP client (for oracle data fetching)
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+
+# Decimal math (for fees, prices, balances)
+rust_decimal = { version = "1", features = ["serde-with-str"] }
+
+# Internal crates
+adenora-common = { path = "crates/adenora-common" }
+adenora-users = { path = "crates/adenora-users" }
+adenora-orderbook = { path = "crates/adenora-orderbook" }
+adenora-markets = { path = "crates/adenora-markets" }
+adenora-oracle = { path = "crates/adenora-oracle" }
+adenora-lottery = { path = "crates/adenora-lottery" }
+adenora-gaming = { path = "crates/adenora-gaming" }
+adenora-botarena = { path = "crates/adenora-botarena" }
+adenora-charity = { path = "crates/adenora-charity" }

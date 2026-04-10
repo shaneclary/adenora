@@ -1,0 +1,40 @@
+# Adenora production reverse proxy
+# Caddy auto-provisions TLS certificates via Let's Encrypt
+
+{$ADENORA_DOMAIN:adenora.app} {
+    # API and WebSocket → Rust backend
+    handle /api/* {
+        reverse_proxy adenora:8080
+    }
+    handle /ws {
+        reverse_proxy adenora:8080
+    }
+    handle /healthz {
+        reverse_proxy adenora:8080
+    }
+
+    # Static frontend → SvelteKit build
+    handle {
+        root * /srv/web
+        try_files {path} /index.html
+        file_server
+    }
+
+    # Security headers
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy strict-origin-when-cross-origin
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+    }
+
+    # Compression
+    encode gzip zstd
+
+    # Logging
+    log {
+        output file /var/log/caddy/access.log
+        format json
+    }
+}

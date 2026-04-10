@@ -1,0 +1,37 @@
+[package]
+name = "adenora-gateway"
+description = "HTTP/WebSocket gateway: auth, routing, rate limiting, fee enforcement"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "adenora"
+path = "src/main.rs"
+
+[dependencies]
+adenora-common = { workspace = true }
+adenora-users = { workspace = true }
+adenora-orderbook = { workspace = true }
+adenora-markets = { workspace = true }
+adenora-oracle = { workspace = true }
+adenora-lottery = { workspace = true }
+adenora-gaming = { workspace = true }
+adenora-botarena = { workspace = true }
+adenora-charity = { workspace = true }
+tokio = { workspace = true }
+axum = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+sqlx = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+dotenvy = { workspace = true }
+anyhow = { workspace = true }
+rust_decimal = { workspace = true }
+hmac = "0.12"
+sha2 = "0.10"
+hex = "0.4"
