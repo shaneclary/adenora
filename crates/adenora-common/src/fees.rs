@@ -10,7 +10,6 @@ use rust_decimal::prelude::*;
 /// Fees are ceiled to the nearest centicent ($0.0001).
 /// Maximum taker fee at P=0.50: ~1.75 cents per contract.
 /// Maximum maker fee at P=0.50: ~0.44 cents per contract.
-
 const TAKER_COEFF: &str = "0.07";
 const MAKER_COEFF: &str = "0.0175";
 const CENTICENT: &str = "0.0001";

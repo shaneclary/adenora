@@ -35,7 +35,7 @@ pub async fn list_campaigns(State(state): State<AppState>) -> ApiResult {
     .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()))?;
 
     let now = chrono::Utc::now();
-    let campaigns: Vec<Value> = rows.into_iter().map(|(id, title, desc, cat, vote_mode, fund_mode, vote_cap, seed, currency, status, opens_at, closes_at)| {
+    let campaigns: Vec<Value> = rows.into_iter().map(|(id, title, desc, cat, vote_mode, fund_mode, vote_cap, seed, currency, status, _opens_at, closes_at)| {
         let remaining = closes_at - now;
         let time_left = if remaining.num_days() > 0 {
             format!("{}d", remaining.num_days())
@@ -280,7 +280,7 @@ pub async fn cast_vote(
     .await
     .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()))?;
 
-    if let Some((_vid, old_proposal, old_amount)) = existing {
+    if let Some((_vid, _old_proposal, old_amount)) = existing {
         // Update existing vote — add more funds
         sqlx::query(
             "UPDATE community_votes SET

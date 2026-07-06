@@ -1,7 +1,7 @@
 use crate::state::AppState;
 use adenora_users::auth::validate_token;
 use axum::{
-    extract::{FromRequestParts, State},
+    extract::FromRequestParts,
     http::{StatusCode, request::Parts},
 };
 use uuid::Uuid;

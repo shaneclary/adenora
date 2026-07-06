@@ -87,7 +87,7 @@ pub async fn predict(
     .await
     .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()))?;
 
-    let (status, charity_project_id, charity_name) = market
+    let (status, _charity_project_id, charity_name) = market
         .ok_or_else(|| err(StatusCode::NOT_FOUND, "market not found"))?;
 
     if status != "active" {
@@ -281,7 +281,7 @@ pub async fn get_market_card(
     // Get price from engine
     let engine = state.get_engine(mid).await;
     let snap = engine.snapshots().await;
-    let yes_price = snap.people.best_ask.unwrap_or(50) as u32;
+    let yes_price = snap.people.best_ask.unwrap_or(50);
     let no_price = 100 - yes_price;
 
     // Count participants
@@ -385,7 +385,7 @@ pub async fn list_market_cards(
     for (mid, question, category, _status, closes_at, charity_name) in &markets {
         let engine = state.get_engine(*mid).await;
         let snap = engine.snapshots().await;
-        let yes_price = snap.people.best_ask.unwrap_or(50) as u32;
+        let yes_price = snap.people.best_ask.unwrap_or(50);
 
         let remaining = *closes_at - now;
         let time_left = if remaining.num_days() > 0 {

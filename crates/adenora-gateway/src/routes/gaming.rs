@@ -193,7 +193,7 @@ pub struct ForecastSubmitRequest {
 /// Submit a forecast prediction.
 pub async fn submit_forecast(
     State(_state): State<AppState>,
-    auth: AuthUser,
+    _auth: AuthUser,
     Json(body): Json<ForecastSubmitRequest>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
     if body.probability < 0.0 || body.probability > 1.0 {

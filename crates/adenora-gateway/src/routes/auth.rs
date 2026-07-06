@@ -3,8 +3,8 @@ use crate::state::AppState;
 use adenora_users::auth;
 use adenora_users::kyc::verify_age;
 use axum::{Json, extract::State, http::StatusCode};
-use chrono::{NaiveDate, Utc};
-use serde::{Deserialize, Serialize};
+use chrono::NaiveDate;
+use serde::Deserialize;
 use serde_json::{json, Value};
 
 #[derive(Deserialize)]

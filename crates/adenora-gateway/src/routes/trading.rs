@@ -211,7 +211,7 @@ pub async fn place_order(
         created_at: Utc::now(),
     };
 
-    let order_id = order.id;
+    let _order_id = order.id;
 
     // Persist order
     sqlx::query(

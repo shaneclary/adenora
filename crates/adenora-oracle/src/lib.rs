@@ -8,7 +8,6 @@ mod tests;
 use adenora_common::types::*;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 /// A piece of evidence collected from a data source for market resolution.
 #[derive(Debug, Clone, Serialize, Deserialize)]

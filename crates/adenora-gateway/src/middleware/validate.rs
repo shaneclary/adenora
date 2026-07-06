@@ -1,6 +1,5 @@
 /// Input validation and sanitization utilities.
 /// Prevents XSS, SQL injection, and other OWASP top 10 attacks.
-
 /// Sanitize a user-provided string: strip HTML tags, limit length.
 pub fn sanitize_text(input: &str, max_len: usize) -> String {
     input

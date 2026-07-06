@@ -177,7 +177,7 @@ pub async fn withdraw(
     }
 
     // Check self-exclusion
-    let exclusion: Option<(Option<chrono::DateTime<chrono::Utc>>,)> = sqlx::query_as(
+    let _exclusion: Option<(Option<chrono::DateTime<chrono::Utc>>,)> = sqlx::query_as(
         "SELECT self_exclusion_until FROM users WHERE id = $1"
     )
     .bind(auth.user_id)

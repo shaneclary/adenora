@@ -1,6 +1,5 @@
 use super::{CharityProject, ProjectCategory};
 use adenora_common::currency::Currency;
-use adenora_common::types::ProjectId;
 use chrono::Utc;
 use rust_decimal::Decimal;
 use uuid::Uuid;

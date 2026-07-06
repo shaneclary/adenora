@@ -1,5 +1,5 @@
 use adenora_common::error::AdenoraError;
-use super::{CreateMarketRequest, MarketCategory};
+use super::CreateMarketRequest;
 
 /// Validate a community market proposal before submission.
 pub fn validate_proposal(req: &CreateMarketRequest) -> Result<(), AdenoraError> {

@@ -7,7 +7,7 @@ use axum::{
     },
     response::IntoResponse,
 };
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -45,7 +45,7 @@ async fn handle_socket(mut socket: WebSocket, state: AppState) {
         "service": "adenora",
         "message": "connected — send {\"cmd\":\"subscribe\",\"market_id\":\"...\"} to start"
     });
-    if socket.send(Message::Text(welcome.to_string().into())).await.is_err() {
+    if socket.send(Message::Text(welcome.to_string())).await.is_err() {
         return;
     }
 
@@ -67,7 +67,7 @@ async fn handle_socket(mut socket: WebSocket, state: AppState) {
                                     "type": "subscribed",
                                     "market_id": market_id
                                 });
-                                if socket.send(Message::Text(resp.to_string().into())).await.is_err() {
+                                if socket.send(Message::Text(resp.to_string())).await.is_err() {
                                     break;
                                 }
                             }
@@ -77,7 +77,7 @@ async fn handle_socket(mut socket: WebSocket, state: AppState) {
                                     "type": "unsubscribed",
                                     "market_id": market_id
                                 });
-                                if socket.send(Message::Text(resp.to_string().into())).await.is_err() {
+                                if socket.send(Message::Text(resp.to_string())).await.is_err() {
                                     break;
                                 }
                             }
@@ -90,19 +90,19 @@ async fn handle_socket(mut socket: WebSocket, state: AppState) {
                                     "people": snaps.people,
                                     "bot": snaps.bot
                                 });
-                                if socket.send(Message::Text(resp.to_string().into())).await.is_err() {
+                                if socket.send(Message::Text(resp.to_string())).await.is_err() {
                                     break;
                                 }
                             }
                             Ok(WsCommand::Ping) => {
                                 let resp = json!({"type": "pong"});
-                                if socket.send(Message::Text(resp.to_string().into())).await.is_err() {
+                                if socket.send(Message::Text(resp.to_string())).await.is_err() {
                                     break;
                                 }
                             }
                             Err(_) => {
                                 let resp = json!({"type": "error", "message": "invalid command"});
-                                if socket.send(Message::Text(resp.to_string().into())).await.is_err() {
+                                if socket.send(Message::Text(resp.to_string())).await.is_err() {
                                     break;
                                 }
                             }
@@ -131,7 +131,7 @@ async fn handle_socket(mut socket: WebSocket, state: AppState) {
                             "spread": snaps.bot.spread
                         }
                     });
-                    if socket.send(Message::Text(update.to_string().into())).await.is_err() {
+                    if socket.send(Message::Text(update.to_string())).await.is_err() {
                         return;
                     }
                 }

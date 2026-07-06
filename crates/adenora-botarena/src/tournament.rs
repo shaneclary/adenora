@@ -2,7 +2,6 @@ use adenora_common::types::*;
 use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 /// A bot trading tournament — scheduled competition on specific markets.
 #[derive(Debug, Clone, Serialize, Deserialize)]
