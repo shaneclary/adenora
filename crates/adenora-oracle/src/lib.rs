@@ -32,6 +32,9 @@ pub struct Dispute {
     pub reason: String,
     pub evidence_links: Vec<String>,
     pub status: DisputeStatus,
+    /// The panel of jurors eligible to vote on this dispute. Only these users'
+    /// votes are accepted, and each may vote at most once.
+    pub selected_jury: Vec<UserId>,
     pub jury_votes: Vec<JuryVote>,
     pub resolution: Option<DisputeResolution>,
     pub created_at: DateTime<Utc>,

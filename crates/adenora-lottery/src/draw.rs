@@ -23,7 +23,10 @@ pub fn generate_draw_numbers(
 /// Check how many numbers match between a ticket and the draw.
 pub fn count_matches(ticket_numbers: &[u32], draw_numbers: &[u32]) -> usize {
     let draw_set: HashSet<u32> = draw_numbers.iter().copied().collect();
-    ticket_numbers
+    // Defensively dedupe ticket numbers so a repeated value cannot be counted
+    // more than once (belt-and-braces alongside insert-time validation).
+    let ticket_set: HashSet<u32> = ticket_numbers.iter().copied().collect();
+    ticket_set
         .iter()
         .filter(|n| draw_set.contains(n))
         .count()

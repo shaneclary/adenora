@@ -112,7 +112,7 @@ pub fn score_answer(
 pub fn seed_questions() -> Vec<TriviaQuestion> {
     vec![
         TriviaQuestion {
-            id: Uuid::new_v4(),
+            id: Uuid::from_u128(0x_0000_0000_0000_0000_0000_0000_0000_0001),
             category: TriviaCategory::Probability,
             question: "If you flip a fair coin 10 times and get heads each time, what is the probability of heads on the 11th flip?".into(),
             options: vec!["Less than 50%".into(), "50%".into(), "More than 50%".into(), "It depends".into()],
@@ -123,7 +123,7 @@ pub fn seed_questions() -> Vec<TriviaQuestion> {
             explanation: Some("Each coin flip is independent. Past results don't affect future probability.".into()),
         },
         TriviaQuestion {
-            id: Uuid::new_v4(),
+            id: Uuid::from_u128(0x_0000_0000_0000_0000_0000_0000_0000_0002),
             category: TriviaCategory::Probability,
             question: "In a prediction market, if a contract trades at 73 cents, what does the market imply?".into(),
             options: vec!["73% probability".into(), "27% probability".into(), "$0.73 profit".into(), "73x leverage".into()],
@@ -134,7 +134,7 @@ pub fn seed_questions() -> Vec<TriviaQuestion> {
             explanation: Some("Prediction market prices approximate the market's consensus probability.".into()),
         },
         TriviaQuestion {
-            id: Uuid::new_v4(),
+            id: Uuid::from_u128(0x_0000_0000_0000_0000_0000_0000_0000_0003),
             category: TriviaCategory::Economics,
             question: "What currency does Kosovo use?".into(),
             options: vec!["Kosovo Dinar".into(), "Euro".into(), "Serbian Dinar".into(), "Albanian Lek".into()],
@@ -145,7 +145,7 @@ pub fn seed_questions() -> Vec<TriviaQuestion> {
             explanation: Some("Kosovo unilaterally adopted the Euro, though it is not in the Eurozone.".into()),
         },
         TriviaQuestion {
-            id: Uuid::new_v4(),
+            id: Uuid::from_u128(0x_0000_0000_0000_0000_0000_0000_0000_0004),
             category: TriviaCategory::Geopolitics,
             question: "Which of these countries is NOT a NATO member?".into(),
             options: vec!["Albania".into(), "North Macedonia".into(), "Serbia".into(), "Montenegro".into()],
@@ -156,7 +156,7 @@ pub fn seed_questions() -> Vec<TriviaQuestion> {
             explanation: Some("Serbia maintains military neutrality and is not a NATO member.".into()),
         },
         TriviaQuestion {
-            id: Uuid::new_v4(),
+            id: Uuid::from_u128(0x_0000_0000_0000_0000_0000_0000_0000_0005),
             category: TriviaCategory::Probability,
             question: "A batch auction collects orders for 500ms then executes. What advantage does this eliminate?".into(),
             options: vec!["Price discovery".into(), "Latency arbitrage".into(), "Market making".into(), "Limit orders".into()],
@@ -167,7 +167,7 @@ pub fn seed_questions() -> Vec<TriviaQuestion> {
             explanation: Some("Batch auctions ensure all orders in a window are treated equally, eliminating speed advantages.".into()),
         },
         TriviaQuestion {
-            id: Uuid::new_v4(),
+            id: Uuid::from_u128(0x_0000_0000_0000_0000_0000_0000_0000_0006),
             category: TriviaCategory::BalkanHistory,
             question: "The Ohrid Framework Agreement (2001) primarily addressed ethnic tensions in which country?".into(),
             options: vec!["Kosovo".into(), "Bosnia".into(), "North Macedonia".into(), "Serbia".into()],
@@ -178,7 +178,7 @@ pub fn seed_questions() -> Vec<TriviaQuestion> {
             explanation: Some("The Ohrid Agreement ended the 2001 insurgency in Macedonia and expanded rights for ethnic Albanians.".into()),
         },
         TriviaQuestion {
-            id: Uuid::new_v4(),
+            id: Uuid::from_u128(0x_0000_0000_0000_0000_0000_0000_0000_0007),
             category: TriviaCategory::Crypto,
             question: "MiCA (Markets in Crypto-Assets) regulation provides what key benefit for licensed platforms?".into(),
             options: vec!["Tax exemption".into(), "EU passporting".into(), "Free mining".into(), "No KYC required".into()],
@@ -189,7 +189,7 @@ pub fn seed_questions() -> Vec<TriviaQuestion> {
             explanation: Some("MiCA allows a crypto platform licensed in one EU state to operate across all EU member states.".into()),
         },
         TriviaQuestion {
-            id: Uuid::new_v4(),
+            id: Uuid::from_u128(0x_0000_0000_0000_0000_0000_0000_0000_0008),
             category: TriviaCategory::Economics,
             question: "In Adenora's fee model, what percentage of trading fees goes to humanitarian projects?".into(),
             options: vec!["20%".into(), "30%".into(), "40%".into(), "50%".into()],

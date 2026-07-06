@@ -94,25 +94,66 @@ fn test_jury_vote_majority() {
     let market_id = Uuid::new_v4();
     let mut d = dispute::file_dispute(market_id, Uuid::new_v4(), "test".into(), vec![]);
 
-    // Vote 6 times for Yes — should reach majority (6 out of 11)
-    for _ in 0..6 {
+    // Assign an 11-juror panel; votes are only accepted from these jurors.
+    let jurors: Vec<Uuid> = (0..11).map(|_| Uuid::new_v4()).collect();
+    dispute::assign_jury(&mut d, jurors.clone());
+
+    // Six distinct panel members vote Yes — should reach majority (6 of 11).
+    for juror_id in jurors.iter().take(6) {
         let vote = crate::JuryVote {
-            juror_id: Uuid::new_v4(),
+            juror_id: *juror_id,
             vote: MarketOutcome::Yes,
             reasoning: None,
             voted_at: chrono::Utc::now(),
         };
-        let result = dispute::record_vote(&mut d, vote);
+        let result = dispute::record_vote(&mut d, vote).expect("panel juror vote accepted");
 
         if d.jury_votes.len() >= 6 {
-            assert!(result.is_some());
-            let resolution = result.unwrap();
+            let resolution = result.expect("majority reached");
             assert!(matches!(resolution.outcome, MarketOutcome::Yes));
             return;
         }
     }
 
     panic!("should have resolved after 6 votes");
+}
+
+#[test]
+fn test_jury_vote_rejects_non_panel_and_double_votes() {
+    let market_id = Uuid::new_v4();
+    let mut d = dispute::file_dispute(market_id, Uuid::new_v4(), "test".into(), vec![]);
+
+    let jurors: Vec<Uuid> = (0..11).map(|_| Uuid::new_v4()).collect();
+    dispute::assign_jury(&mut d, jurors.clone());
+
+    // A user who is not on the panel cannot vote.
+    let outsider = crate::JuryVote {
+        juror_id: Uuid::new_v4(),
+        vote: MarketOutcome::Yes,
+        reasoning: None,
+        voted_at: chrono::Utc::now(),
+    };
+    assert!(dispute::record_vote(&mut d, outsider).is_err());
+    assert_eq!(d.jury_votes.len(), 0);
+
+    // A panel juror votes once — accepted.
+    let vote = crate::JuryVote {
+        juror_id: jurors[0],
+        vote: MarketOutcome::Yes,
+        reasoning: None,
+        voted_at: chrono::Utc::now(),
+    };
+    assert!(dispute::record_vote(&mut d, vote).is_ok());
+
+    // The same juror cannot vote a second time.
+    let dup = crate::JuryVote {
+        juror_id: jurors[0],
+        vote: MarketOutcome::No,
+        reasoning: None,
+        voted_at: chrono::Utc::now(),
+    };
+    assert!(dispute::record_vote(&mut d, dup).is_err());
+    assert_eq!(d.jury_votes.len(), 1);
 }
 
 #[test]

@@ -37,7 +37,7 @@ pub fn validate_proposal(req: &CreateMarketRequest) -> Result<(), AdenoraError> 
 }
 
 /// Content policy — reject markets about individual death, suffering, etc.
-pub fn passes_content_policy(question: &str, _description: &str) -> bool {
+pub fn passes_content_policy(question: &str, description: &str) -> bool {
     let banned_phrases = [
         "will die",
         "death of",
@@ -46,6 +46,9 @@ pub fn passes_content_policy(question: &str, _description: &str) -> bool {
         "be killed",
         "murder of",
     ];
-    let lower = question.to_lowercase();
-    !banned_phrases.iter().any(|phrase| lower.contains(phrase))
+    let question_lower = question.to_lowercase();
+    let description_lower = description.to_lowercase();
+    !banned_phrases
+        .iter()
+        .any(|phrase| question_lower.contains(phrase) || description_lower.contains(phrase))
 }

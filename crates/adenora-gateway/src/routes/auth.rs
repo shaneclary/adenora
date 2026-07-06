@@ -1,7 +1,9 @@
+use crate::middleware::validate::{is_strong_password, is_valid_display_name, is_valid_email};
 use crate::state::AppState;
 use adenora_users::auth;
+use adenora_users::kyc::verify_age;
 use axum::{Json, extract::State, http::StatusCode};
-use chrono::Utc;
+use chrono::{NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -26,6 +28,24 @@ pub async fn register(
     State(state): State<AppState>,
     Json(body): Json<RegisterRequest>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    // Validate input before touching the database.
+    if !is_valid_email(&body.email) {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "invalid email address"}))));
+    }
+    if let Err(msg) = is_strong_password(&body.password) {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": msg}))));
+    }
+    if let Err(msg) = is_valid_display_name(&body.display_name) {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": msg}))));
+    }
+
+    // Age check: parse the supplied date of birth and enforce the minimum age.
+    let dob = NaiveDate::parse_from_str(&body.date_of_birth, "%Y-%m-%d")
+        .map_err(|_| (StatusCode::BAD_REQUEST, Json(json!({"error": "invalid date of birth (expected YYYY-MM-DD)"}))))?;
+    if verify_age(dob, state.config.auth.min_age).is_err() {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "must meet minimum age requirement"}))));
+    }
+
     // Hash password
     let password_hash = auth::hash_password(&body.password)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;

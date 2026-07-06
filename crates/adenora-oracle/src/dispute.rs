@@ -20,11 +20,19 @@ pub fn file_dispute(
         reason,
         evidence_links,
         status: DisputeStatus::Filed,
+        selected_jury: Vec::new(),
         jury_votes: Vec::new(),
         resolution: None,
         created_at: Utc::now(),
         resolved_at: None,
     }
+}
+
+/// Assign the selected panel of jurors to a dispute and move it into voting.
+/// Votes are only accepted from jurors recorded here.
+pub fn assign_jury(dispute: &mut Dispute, jurors: Vec<UserId>) {
+    dispute.selected_jury = jurors;
+    dispute.status = DisputeStatus::Voting;
 }
 
 /// Select random jurors from verified users (excluding challenger and market participants).
@@ -46,14 +54,33 @@ pub fn select_jury(
 }
 
 /// Record a jury vote and check if we have a verdict.
-pub fn record_vote(dispute: &mut Dispute, vote: JuryVote) -> Option<DisputeResolution> {
+///
+/// Rejects the vote unless the voter is on this dispute's selected panel and has
+/// not already voted — without this a single actor could cast every vote and
+/// unilaterally decide the outcome.
+pub fn record_vote(
+    dispute: &mut Dispute,
+    vote: JuryVote,
+) -> Result<Option<DisputeResolution>, AdenoraError> {
+    if !dispute.selected_jury.contains(&vote.juror_id) {
+        return Err(AdenoraError::InvalidJuryVote(
+            "voter is not on the selected jury panel".into(),
+        ));
+    }
+
+    if dispute.jury_votes.iter().any(|v| v.juror_id == vote.juror_id) {
+        return Err(AdenoraError::InvalidJuryVote(
+            "juror has already voted".into(),
+        ));
+    }
+
     dispute.jury_votes.push(vote);
 
     // Need majority (>50%) to resolve
     let majority_needed = (JURY_SIZE / 2) + 1;
 
     if dispute.jury_votes.len() < majority_needed {
-        return None;
+        return Ok(None);
     }
 
     // Count votes per outcome
@@ -81,12 +108,12 @@ pub fn record_vote(dispute: &mut Dispute, vote: JuryVote) -> Option<DisputeResol
         dispute.status = DisputeStatus::Resolved;
         dispute.resolution = Some(resolution.clone());
         dispute.resolved_at = Some(Utc::now());
-        Some(resolution)
+        Ok(Some(resolution))
     } else if dispute.jury_votes.len() >= JURY_SIZE {
         // All votes in but no majority — escalate
         dispute.status = DisputeStatus::Escalated;
-        None
+        Ok(None)
     } else {
-        None
+        Ok(None)
     }
 }

@@ -63,8 +63,8 @@ pub async fn buy_ticket(
         }
     }
 
-    let lottery: Option<(Uuid, Decimal, String, Uuid, i32, i32, i32)> = sqlx::query_as(
-        "SELECT id, ticket_price, currency, project_id, prize_pct, project_pct, company_pct
+    let lottery: Option<(Uuid, Decimal, String, Uuid, i32, i32, i32, String)> = sqlx::query_as(
+        "SELECT id, ticket_price, currency, project_id, prize_pct, project_pct, company_pct, game_type
          FROM lotteries WHERE id = $1 AND status = 'active'"
     )
     .bind(lottery_id)
@@ -72,8 +72,39 @@ pub async fn buy_ticket(
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
 
-    let (_, ticket_price, currency, project_id, prize_pct, project_pct, _company_pct) = lottery
+    let (_, ticket_price, currency, project_id, prize_pct, project_pct, _company_pct, game_type) = lottery
         .ok_or((StatusCode::NOT_FOUND, Json(json!({"error": "lottery not found or not active"}))))?;
+
+    // Validate submitted numbers against the game's rules. The (pick_count, max_number)
+    // mapping mirrors the authoritative draw executor (services/draw_executor.rs); the
+    // minimum number is 1 inclusive, matching generate_draw_numbers(count, 1, max).
+    // This prevents the jackpot exploit where an unvalidated ticket like [1,1,1,1,1,1]
+    // could score multiple matches off a single drawn value.
+    let (pick_count, max_number): (usize, i32) = match game_type.as_str() {
+        "draw" => (6, 49),
+        "numbers" => (4, 9),
+        "fifty_fifty" => (1, 2),
+        _ => (6, 49),
+    };
+
+    if body.numbers.len() != pick_count {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({
+            "error": format!("ticket must contain exactly {pick_count} numbers")
+        }))));
+    }
+
+    if body.numbers.iter().any(|n| *n < 1 || *n > max_number) {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({
+            "error": format!("each number must be between 1 and {max_number} inclusive")
+        }))));
+    }
+
+    let mut seen = std::collections::HashSet::new();
+    if !body.numbers.iter().all(|n| seen.insert(*n)) {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({
+            "error": "ticket numbers must not contain duplicates"
+        }))));
+    }
 
     let draw: Option<(Uuid, i32)> = sqlx::query_as(
         "SELECT id, draw_number FROM draws

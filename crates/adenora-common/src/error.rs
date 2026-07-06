@@ -46,6 +46,8 @@ pub enum AdenoraError {
     DisputePeriodEnded(Uuid),
     #[error("insufficient oracle sources: need {need}, have {have}")]
     InsufficientOracleSources { need: u32, have: u32 },
+    #[error("invalid jury vote: {0}")]
+    InvalidJuryVote(String),
 
     // Lottery
     #[error("lottery {0} not found")]
@@ -87,7 +89,8 @@ impl AdenoraError {
             | Self::DisputePeriodEnded(_) | Self::InsufficientOracleSources { .. }
             | Self::DrawAlreadyCompleted(_) | Self::TicketLimitExceeded
             | Self::DepositLimitExceeded(_) | Self::SelfExclusionActive(_)
-            | Self::CoolingOffActive | Self::AgeVerificationRequired => 400,
+            | Self::CoolingOffActive | Self::AgeVerificationRequired
+            | Self::InvalidJuryVote(_) => 400,
             Self::Database(_) | Self::Internal(_) => 500,
         }
     }

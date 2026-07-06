@@ -152,6 +152,11 @@ pub async fn propose_market(
         return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "description must be 1-5000 characters"}))));
     }
 
+    // Content policy — reject markets about individual death, suffering, assassination, etc.
+    if !adenora_markets::proposal::passes_content_policy(&body.question, &body.description) {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "market proposal violates content policy"}))));
+    }
+
     let request_json = serde_json::to_value(&body)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
 
