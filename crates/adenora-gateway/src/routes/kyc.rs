@@ -52,21 +52,26 @@ pub async fn kyc_webhook(
 ) -> impl IntoResponse {
     let secret = &state.config.kyc.webhook_secret;
 
-    // Verify HMAC signature from X-HMAC-Signature header
-    if let Some(sig_header) = headers.get("x-hmac-signature").and_then(|v| v.to_str().ok()) {
-        type HmacSha256 = Hmac<Sha256>;
-        let mut mac = HmacSha256::new_from_slice(secret.as_bytes())
-            .expect("HMAC key length is always valid");
-        mac.update(&body);
-
-        let expected = hex::encode(mac.finalize().into_bytes());
-        if sig_header != expected {
-            tracing::warn!("KYC webhook HMAC signature mismatch");
-            return StatusCode::UNAUTHORIZED;
-        }
-    } else if secret != "CHANGE_ME_IN_PRODUCTION" {
-        // In production with a real secret, reject unsigned requests
+    // Always require a valid HMAC signature. An unsigned webhook must never be
+    // trusted — it can mark any account KYC-verified and overwrite its DOB.
+    let Some(sig_header) = headers.get("x-hmac-signature").and_then(|v| v.to_str().ok()) else {
         tracing::warn!("KYC webhook missing HMAC signature header");
+        return StatusCode::UNAUTHORIZED;
+    };
+
+    let Ok(provided) = hex::decode(sig_header) else {
+        tracing::warn!("KYC webhook signature is not valid hex");
+        return StatusCode::UNAUTHORIZED;
+    };
+
+    type HmacSha256 = Hmac<Sha256>;
+    let mut mac = HmacSha256::new_from_slice(secret.as_bytes())
+        .expect("HMAC key length is always valid");
+    mac.update(&body);
+
+    // `verify_slice` is constant-time, avoiding a timing side channel.
+    if mac.verify_slice(&provided).is_err() {
+        tracing::warn!("KYC webhook HMAC signature mismatch");
         return StatusCode::UNAUTHORIZED;
     }
 

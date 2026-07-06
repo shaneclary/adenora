@@ -21,8 +21,8 @@ pub async fn recovery_loop(state: AppState) {
 }
 
 async fn cleanup_orphan_orders(state: &AppState) {
-    let orphans: Vec<(Uuid, Uuid, i32, i32, Uuid)> = sqlx::query_as(
-        "SELECT o.id, o.market_id, o.price_cents, o.quantity - o.filled_quantity as unfilled, o.user_id
+    let orphans: Vec<(Uuid, Uuid, i32, i32, Uuid, String)> = sqlx::query_as(
+        "SELECT o.id, o.market_id, o.price_cents, o.quantity - o.filled_quantity as unfilled, o.user_id, o.action
          FROM orders o
          JOIN markets m ON m.id = o.market_id
          WHERE o.status IN ('pending', 'partial_fill')
@@ -32,7 +32,7 @@ async fn cleanup_orphan_orders(state: &AppState) {
     .await
     .unwrap_or_default();
 
-    for (order_id, market_id, price_cents, unfilled, user_id) in &orphans {
+    for (order_id, market_id, price_cents, unfilled, user_id, action) in &orphans {
         // Cancel the order
         sqlx::query("UPDATE orders SET status = 'expired', updated_at = NOW() WHERE id = $1")
             .bind(order_id)
@@ -40,8 +40,9 @@ async fn cleanup_orphan_orders(state: &AppState) {
             .await
             .ok();
 
-        // Release reserved funds
-        if *unfilled > 0 {
+        // Release reserved funds — only buys reserve funds; releasing on a sell
+        // would credit money that was never reserved.
+        if action == "buy" && *unfilled > 0 {
             let release = Decimal::new(*price_cents as i64 * *unfilled as i64, 2);
             sqlx::query(
                 "UPDATE wallets SET reserved = GREATEST(reserved - $1, 0), available = available + $1, updated_at = NOW()

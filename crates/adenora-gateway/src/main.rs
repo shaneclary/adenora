@@ -23,6 +23,10 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let config = AdenoraConfig::from_env();
+    if let Err(e) = config.validate() {
+        tracing::error!("{e}");
+        anyhow::bail!("refusing to start with insecure configuration: {e}");
+    }
     let bind_addr = config.server.bind_addr;
     tracing::info!("Adenora starting on {bind_addr}");
 

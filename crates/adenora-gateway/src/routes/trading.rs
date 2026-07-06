@@ -133,6 +133,32 @@ pub async fn place_order(
         0 // Selling existing position
     };
 
+    if action == Action::Sell {
+        // Sells must be backed by an existing position on the same side/mode.
+        // Without this check a user could sell contracts they never bought and
+        // receive the proceeds for free (naked selling).
+        let held: Option<(i32,)> = sqlx::query_as(
+            "SELECT quantity FROM positions
+             WHERE user_id = $1 AND market_id = $2 AND side = $3 AND mode = $4"
+        )
+        .bind(auth.user_id)
+        .bind(body.market_id)
+        .bind(&body.side)
+        .bind(mode_db)
+        .fetch_optional(&state.db)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+
+        let held_qty = held.map(|(q,)| q).unwrap_or(0);
+        if held_qty < body.quantity as i32 {
+            return Err((StatusCode::BAD_REQUEST, Json(json!({
+                "error": "insufficient position to sell",
+                "held": held_qty,
+                "requested": body.quantity
+            }))));
+        }
+    }
+
     if cost_cents > 0 {
         let cost = Decimal::new(cost_cents, 2);
 
@@ -293,17 +319,37 @@ pub async fn persist_trades(state: &AppState, trades: &[adenora_orderbook::book:
             tracing::error!(trade_id = %trade.id, user_id = %trade.buyer_user_id, error = %e, "failed to update buyer position");
         }
 
-        // Debit buyer reserved funds, credit seller
+        // Debit buyer: release the reserved trade value and take the fee from
+        // available. Only `trade_value` was ever reserved (fees are charged at
+        // fill time), so debiting the fee from `reserved` would drive it negative.
         let trade_value = Decimal::new(trade.price_cents as i64 * trade.quantity as i64, 2);
         if let Err(e) = sqlx::query(
-            "UPDATE wallets SET reserved = reserved - $1, updated_at = NOW()
-             WHERE user_id = $2 AND currency = 'EUR'"
+            "UPDATE wallets SET reserved = GREATEST(reserved - $1, 0), available = available - $2, updated_at = NOW()
+             WHERE user_id = $3 AND currency = 'EUR'"
         )
-        .bind(trade_value + trade.buyer_fee)
+        .bind(trade_value)
+        .bind(trade.buyer_fee)
         .bind(trade.buyer_user_id)
         .execute(&state.db)
         .await {
-            tracing::error!(trade_id = %trade.id, error = %e, "failed to debit buyer reserved funds");
+            tracing::error!(trade_id = %trade.id, error = %e, "failed to debit buyer funds");
+        }
+
+        // Decrement the seller's position on the side they sold. Without this a
+        // user could sell the same position repeatedly and be paid again at
+        // settlement for contracts they no longer hold.
+        if let Err(e) = sqlx::query(
+            "UPDATE positions SET quantity = GREATEST(quantity - $1, 0), updated_at = NOW()
+             WHERE user_id = $2 AND market_id = $3 AND side = $4 AND mode = $5"
+        )
+        .bind(trade.quantity as i32)
+        .bind(trade.seller_user_id)
+        .bind(trade.market_id)
+        .bind(&side_str)
+        .bind(&mode_str)
+        .execute(&state.db)
+        .await {
+            tracing::error!(trade_id = %trade.id, error = %e, "failed to decrement seller position");
         }
 
         if let Err(e) = sqlx::query(
@@ -401,8 +447,8 @@ pub async fn cancel_order(
     Path(id): Path<Uuid>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
     // Verify ownership
-    let row: Option<(Uuid, String, Uuid, i32, i32, i32)> = sqlx::query_as(
-        "SELECT market_id, mode, user_id, price_cents, quantity, filled_quantity
+    let row: Option<(Uuid, String, Uuid, i32, i32, i32, String)> = sqlx::query_as(
+        "SELECT market_id, mode, user_id, price_cents, quantity, filled_quantity, action
          FROM orders WHERE id = $1 AND status IN ('pending', 'partial_fill')"
     )
     .bind(id)
@@ -410,7 +456,7 @@ pub async fn cancel_order(
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
 
-    let (market_id, mode_str, owner_id, price_cents, quantity, filled) = row
+    let (market_id, mode_str, owner_id, price_cents, quantity, filled, action) = row
         .ok_or((StatusCode::NOT_FOUND, Json(json!({"error": "order not found or not cancellable"}))))?;
 
     if owner_id != auth.user_id && !auth.is_admin {
@@ -427,25 +473,31 @@ pub async fn cancel_order(
         .await
         .ok();
 
-    // Release reserved funds for unfilled portion
+    // Release reserved funds for unfilled portion — only buys reserve funds.
+    // Sells reserve nothing, so releasing on cancel would credit money that was
+    // never reserved. Release to the order's owner, not the caller (an admin may
+    // cancel another user's order).
     let unfilled = quantity - filled;
-    if unfilled > 0 {
+    let released = if action == "buy" && unfilled > 0 {
         let release = Decimal::new(price_cents as i64 * unfilled as i64, 2);
         sqlx::query(
             "UPDATE wallets SET reserved = GREATEST(reserved - $1, 0), available = available + $1, updated_at = NOW()
              WHERE user_id = $2 AND currency = 'EUR'"
         )
         .bind(release)
-        .bind(auth.user_id)
+        .bind(owner_id)
         .execute(&state.db)
         .await
         .ok();
-    }
+        release
+    } else {
+        Decimal::ZERO
+    };
 
     Ok(Json(json!({
         "order_id": id,
         "status": "cancelled",
-        "released_funds": Decimal::new(price_cents as i64 * unfilled as i64, 2)
+        "released_funds": released
     })))
 }
 

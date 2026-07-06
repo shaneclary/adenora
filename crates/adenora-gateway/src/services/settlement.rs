@@ -44,6 +44,12 @@ pub async fn settle_market(state: &AppState, market_id: Uuid) -> anyhow::Result<
 
     let mut settled_count = 0u32;
 
+    // All payouts, position zeroing, and the market-status flip run in one
+    // transaction. If any step fails the whole thing rolls back, so the 10s
+    // settlement loop can safely retry without double-paying winners it had
+    // already credited before the failure.
+    let mut tx = state.db.begin().await?;
+
     for (pos_id, user_id, side, qty, avg_price, mode) in &positions {
         let payout_per_contract = if side == winning_side {
             // Winner: receives $1.00 per contract
@@ -64,7 +70,7 @@ pub async fn settle_market(state: &AppState, market_id: Uuid) -> anyhow::Result<
             )
             .bind(total_payout)
             .bind(user_id)
-            .execute(&state.db)
+            .execute(&mut *tx)
             .await?;
 
             // Record transaction
@@ -77,16 +83,17 @@ pub async fn settle_market(state: &AppState, market_id: Uuid) -> anyhow::Result<
             .bind(total_payout)
             .bind(market_id)
             .bind(format!("settlement payout: {} side won, {}x @ $1.00, P&L: {}", winning_side, qty, total_payout - cost_basis))
-            .execute(&state.db)
+            .execute(&mut *tx)
             .await?;
         }
 
         // Zero out position
         sqlx::query("UPDATE positions SET quantity = 0, updated_at = NOW() WHERE id = $1")
             .bind(pos_id)
-            .execute(&state.db)
+            .execute(&mut *tx)
             .await?;
 
+        let _ = mode;
         settled_count += 1;
     }
 
@@ -95,8 +102,10 @@ pub async fn settle_market(state: &AppState, market_id: Uuid) -> anyhow::Result<
         "UPDATE markets SET status = 'settled', resolved_at = NOW(), updated_at = NOW() WHERE id = $1"
     )
     .bind(market_id)
-    .execute(&state.db)
+    .execute(&mut *tx)
     .await?;
+
+    tx.commit().await?;
 
     // Remove engine from memory
     state.engines.write().await.remove(&market_id);
@@ -118,6 +127,10 @@ async fn void_market(state: &AppState, market_id: Uuid) -> anyhow::Result<u32> {
 
     let mut count = 0u32;
 
+    // Single transaction so a mid-loop failure rolls back and a retry cannot
+    // double-refund positions already credited.
+    let mut tx = state.db.begin().await?;
+
     for (pos_id, user_id, qty, avg_price) in &positions {
         let refund = *avg_price * Decimal::from(*qty);
 
@@ -127,7 +140,7 @@ async fn void_market(state: &AppState, market_id: Uuid) -> anyhow::Result<u32> {
         )
         .bind(refund)
         .bind(user_id)
-        .execute(&state.db)
+        .execute(&mut *tx)
         .await?;
 
         sqlx::query(
@@ -138,12 +151,12 @@ async fn void_market(state: &AppState, market_id: Uuid) -> anyhow::Result<u32> {
         .bind(user_id)
         .bind(refund)
         .bind(market_id)
-        .execute(&state.db)
+        .execute(&mut *tx)
         .await?;
 
         sqlx::query("UPDATE positions SET quantity = 0, updated_at = NOW() WHERE id = $1")
             .bind(pos_id)
-            .execute(&state.db)
+            .execute(&mut *tx)
             .await?;
 
         count += 1;
@@ -153,8 +166,10 @@ async fn void_market(state: &AppState, market_id: Uuid) -> anyhow::Result<u32> {
         "UPDATE markets SET status = 'settled', outcome = 'void', resolved_at = NOW(), updated_at = NOW() WHERE id = $1"
     )
     .bind(market_id)
-    .execute(&state.db)
+    .execute(&mut *tx)
     .await?;
+
+    tx.commit().await?;
 
     state.engines.write().await.remove(&market_id);
 

@@ -12,18 +12,17 @@ use axum::{
 
 use crate::state::AppState;
 
-/// Axum middleware: enforce per-IP rate limit for human users.
-/// Bots identified by `X-Bot-Key` header bypass rate limiting.
+/// Axum middleware: enforce per-IP rate limit.
+///
+/// Note: the `X-Bot-Key` header used to bypass this limiter on mere presence,
+/// but there is no stored bot key to validate it against, so any client could
+/// spoof it for unlimited throughput. All requests are now rate-limited; bots
+/// authenticate via JWT like any other account.
 pub async fn rate_limit_middleware(
     State(state): State<AppState>,
     req: Request,
     next: Next,
 ) -> Response {
-    // Bots bypass rate limiting
-    if req.headers().contains_key("x-bot-key") {
-        return next.run(req).await;
-    }
-
     let ip = req
         .headers()
         .get("x-forwarded-for")

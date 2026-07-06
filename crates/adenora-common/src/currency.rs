@@ -48,6 +48,26 @@ impl Currency {
         }
     }
 
+    /// Parse an ISO-style currency code (case-insensitive). Returns `None` for
+    /// codes the platform does not support.
+    pub fn from_code(code: &str) -> Option<Currency> {
+        match code.to_ascii_uppercase().as_str() {
+            "EUR" => Some(Currency::Eur),
+            "ALL" => Some(Currency::All),
+            "MKD" => Some(Currency::Mkd),
+            "RSD" => Some(Currency::Rsd),
+            "BAM" => Some(Currency::Bam),
+            "HRK" => Some(Currency::Hrk),
+            "BGN" => Some(Currency::Bgn),
+            "RON" => Some(Currency::Ron),
+            "HUF" => Some(Currency::Huf),
+            "TRY" => Some(Currency::Try),
+            "USD" => Some(Currency::Usd),
+            "USDC" => Some(Currency::Usdc),
+            _ => None,
+        }
+    }
+
     pub fn decimal_places(&self) -> u32 {
         match self {
             Currency::Usdc => 6, // USDC uses 6 decimals on Polygon

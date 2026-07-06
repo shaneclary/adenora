@@ -140,4 +140,37 @@ impl AdenoraConfig {
             },
         }
     }
+
+    /// The literal used as the fallback for any secret that is not configured.
+    /// It is public knowledge (it ships in `.env.example`), so booting with it
+    /// would let anyone forge JWTs or KYC webhooks.
+    pub const INSECURE_DEFAULT_SECRET: &'static str = "CHANGE_ME_IN_PRODUCTION";
+
+    /// Reject an insecure configuration before the server starts serving.
+    ///
+    /// Refuses to boot if any secret is still the well-known default, unless
+    /// `ADENORA_ALLOW_INSECURE_DEFAULTS=1` is set (for local development/tests).
+    pub fn validate(&self) -> Result<(), String> {
+        if env::var("ADENORA_ALLOW_INSECURE_DEFAULTS").as_deref() == Ok("1") {
+            return Ok(());
+        }
+
+        let mut problems = Vec::new();
+        if self.auth.jwt_secret == Self::INSECURE_DEFAULT_SECRET {
+            problems.push("JWT_SECRET is unset or the well-known default");
+        }
+        if self.kyc.webhook_secret == Self::INSECURE_DEFAULT_SECRET {
+            problems.push("KYC_WEBHOOK_SECRET is unset or the well-known default");
+        }
+
+        if problems.is_empty() {
+            Ok(())
+        } else {
+            Err(format!(
+                "insecure configuration: {}. Set real secrets, or export \
+                 ADENORA_ALLOW_INSECURE_DEFAULTS=1 for local development only.",
+                problems.join("; ")
+            ))
+        }
+    }
 }
