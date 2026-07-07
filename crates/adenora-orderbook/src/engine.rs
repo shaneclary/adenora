@@ -1,6 +1,7 @@
 use crate::batch::BatchEngine;
 use crate::book::{BookSnapshot, Order, Trade};
 use crate::continuous::ContinuousEngine;
+use crate::matching::MatchResult;
 use adenora_common::types::*;
 
 /// Dual-mode market engine — wraps both People (batch) and Bot (continuous)
@@ -30,10 +31,11 @@ impl DualModeEngine {
                 SubmitResult::Queued { order_id: id }
             }
             MarketMode::Unlimited => {
-                let (id, trades) = self.bot.submit(order).await;
+                let (id, result) = self.bot.submit(order).await;
                 SubmitResult::Executed {
                     order_id: id,
-                    trades,
+                    trades: result.trades,
+                    cancelled: result.cancelled,
                 }
             }
         }
@@ -48,8 +50,21 @@ impl DualModeEngine {
     }
 
     /// Execute a batch cycle for the people-mode engine.
-    pub async fn execute_people_batch(&self) -> (BatchId, Vec<Trade>) {
+    pub async fn execute_people_batch(&self) -> (BatchId, MatchResult) {
         self.people.execute_batch().await
+    }
+
+    /// Rehydrate a resting people-mode order into the book (startup recovery).
+    pub async fn rehydrate_people(&self, order: Order) {
+        self.people.rehydrate(order).await;
+    }
+
+    /// Rehydrate a resting order into the engine matching its mode (startup).
+    pub async fn rehydrate(&self, order: Order) {
+        match order.mode {
+            MarketMode::People => self.people.rehydrate(order).await,
+            MarketMode::Unlimited => self.bot.rehydrate(order).await,
+        }
     }
 
     /// Get order book snapshots for both modes.
@@ -70,6 +85,9 @@ pub enum SubmitResult {
     Executed {
         order_id: OrderId,
         trades: Vec<Trade>,
+        /// Orders the engine removed during matching (self-trade prevention or
+        /// IOC/FOK that could not fill) — their reserved funds must be released.
+        cancelled: Vec<OrderId>,
     },
 }
 

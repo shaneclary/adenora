@@ -211,15 +211,17 @@ pub async fn predict(
         .ok(); // non-critical — don't fail the prediction over a social feature
     }
 
-    // Get user display name for response
-    let display_name: Option<(String,)> = sqlx::query_as(
+    // Get user display name for the response confirmation.
+    let display_name: String = sqlx::query_as::<_, (String,)>(
         "SELECT display_name FROM users WHERE id = $1"
     )
     .bind(auth.user_id)
     .fetch_optional(&state.db)
     .await
     .ok()
-    .flatten();
+    .flatten()
+    .map(|(n,)| n)
+    .unwrap_or_default();
 
     tracing::info!(
         user_id = %auth.user_id,
@@ -235,6 +237,7 @@ pub async fn predict(
     Ok(Json(json!({
         "prediction_id": order_id,
         "status": status_str,
+        "predictor": display_name,
         "side": format!("{:?}", side).to_lowercase(),
         "amount_eur": actual_cost.to_string(),
         "contracts": quantity,

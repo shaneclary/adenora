@@ -40,6 +40,10 @@ async fn main() -> anyhow::Result<()> {
         .expect("failed to run migrations");
     tracing::info!("migrations applied");
 
+    // Rehydrate resting orders into in-memory engines before batches run, so a
+    // restart doesn't strand open GTC orders (funds reserved, book empty).
+    rehydrate_open_orders(&state).await;
+
     // Spawn background services
     let batch_state = state.clone();
     tokio::spawn(async move { batch_loop(batch_state).await });
@@ -146,7 +150,6 @@ async fn main() -> anyhow::Result<()> {
                     .allow_headers([
                         axum::http::header::CONTENT_TYPE,
                         axum::http::header::AUTHORIZATION,
-                        axum::http::header::HeaderName::from_static("x-bot-key"),
                     ])
                     .allow_credentials(true)
             }
@@ -155,9 +158,70 @@ async fn main() -> anyhow::Result<()> {
 
     let listener = tokio::net::TcpListener::bind(&bind_addr).await?;
     tracing::info!("Adenora listening on {bind_addr}");
-    axum::serve(listener, app).await?;
+    // `into_make_service_with_connect_info` exposes the socket peer address to
+    // the rate-limit middleware so it can key on the real client IP.
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    )
+    .await?;
 
     Ok(())
+}
+
+/// Reload resting GTC orders on active markets into their in-memory engines.
+/// Runs once at startup. Only GTC orders are meant to rest; IOC/FOK are
+/// immediate and must not be rehydrated.
+async fn rehydrate_open_orders(state: &state::AppState) {
+    use adenora_common::types::*;
+    use adenora_orderbook::book::Order;
+    use uuid::Uuid;
+
+    let rows: Vec<(Uuid, Uuid, Uuid, String, String, i32, i32, i32, String, Option<Uuid>, chrono::DateTime<chrono::Utc>)> =
+        sqlx::query_as(
+            "SELECT o.id, o.user_id, o.market_id, o.side, o.action, o.price_cents,
+                    o.quantity, o.filled_quantity, o.mode, o.bot_id, o.created_at
+             FROM orders o
+             JOIN markets m ON m.id = o.market_id
+             WHERE o.status IN ('pending', 'partial_fill')
+               AND o.time_in_force = 'gtc'
+               AND m.status = 'active'"
+        )
+        .fetch_all(&state.db)
+        .await
+        .unwrap_or_default();
+
+    let mut count = 0u32;
+    for (id, user_id, market_id, side_s, action_s, price_cents, quantity, filled, mode_s, bot_id, created_at) in rows {
+        let side = if side_s == "no" { Side::No } else { Side::Yes };
+        let action = if action_s == "sell" { Action::Sell } else { Action::Buy };
+        let mode = if mode_s == "unlimited" { MarketMode::Unlimited } else { MarketMode::People };
+        let status = if filled > 0 { OrderStatus::PartialFill } else { OrderStatus::Pending };
+
+        let order = Order {
+            id,
+            user_id,
+            market_id,
+            side,
+            action,
+            price_cents: price_cents.max(0) as u32,
+            quantity: quantity.max(0) as u32,
+            filled_quantity: filled.max(0) as u32,
+            time_in_force: TimeInForce::Gtc,
+            status,
+            mode,
+            bot_id,
+            created_at,
+        };
+
+        let engine = state.get_engine(market_id).await;
+        engine.rehydrate(order).await;
+        count += 1;
+    }
+
+    if count > 0 {
+        tracing::info!(orders = count, "rehydrated resting orders into engines");
+    }
 }
 
 /// Background: execute batch auctions + persist trades for all people-mode markets.
@@ -173,14 +237,20 @@ async fn batch_loop(state: state::AppState) {
             let engine = engine.clone();
             let st = state.clone();
             tokio::spawn(async move {
-                let (_batch_id, trades) = engine.execute_people_batch().await;
-                if !trades.is_empty() {
-                    routes::trading::persist_trades(&st, &trades).await;
+                let (_batch_id, result) = engine.execute_people_batch().await;
+                // Persist fills first so filled_quantity is up to date, then
+                // release funds for any orders the auction cancelled (unfilled
+                // IOC/FOK, self-trade) using the post-fill quantities.
+                if !result.trades.is_empty() {
+                    routes::trading::persist_trades(&st, &result.trades).await;
                     tracing::debug!(
                         market_id = %engine.market_id,
-                        trades = trades.len(),
+                        trades = result.trades.len(),
                         "batch executed"
                     );
+                }
+                if !result.cancelled.is_empty() {
+                    routes::trading::release_cancelled_orders(&st, &result.cancelled).await;
                 }
             });
         }

@@ -64,8 +64,8 @@ async fn main() {
 
     let mut all_trades = Vec::new();
     for order in flow {
-        let (_, trades) = engine.submit(order).await;
-        all_trades.extend(trades);
+        let (_, result) = engine.submit(order).await;
+        all_trades.extend(result.trades);
     }
 
     let snapshot = engine.snapshot().await;

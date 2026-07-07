@@ -192,3 +192,57 @@ pub struct BookSnapshot {
     pub spread: Option<i32>,
     pub timestamp: DateTime<Utc>,
 }
+
+/// The order books for a single market in a single mode, segregated by outcome
+/// side. YES and NO are distinct instruments and must never match against each
+/// other, so each gets its own [`OrderBook`]. A buy-NO only ever crosses a
+/// sell-NO — an earlier design shared one book keyed on buy/sell alone, which
+/// let opposite instruments trade and corrupted positions and settlement.
+#[derive(Debug, Clone, Default)]
+pub struct MarketBook {
+    pub yes: OrderBook,
+    pub no: OrderBook,
+}
+
+impl MarketBook {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// The book for a given outcome side.
+    pub fn side_mut(&mut self, side: Side) -> &mut OrderBook {
+        match side {
+            Side::Yes => &mut self.yes,
+            Side::No => &mut self.no,
+        }
+    }
+
+    pub fn side(&self, side: Side) -> &OrderBook {
+        match side {
+            Side::Yes => &self.yes,
+            Side::No => &self.no,
+        }
+    }
+
+    /// Route an order to the book for its side.
+    pub fn submit_order(&mut self, order: Order) {
+        self.side_mut(order.side).submit_order(order);
+    }
+
+    /// Cancel an order from whichever side holds it.
+    pub fn cancel_order(&mut self, order_id: OrderId) -> Option<Order> {
+        self.yes
+            .cancel_order(order_id)
+            .or_else(|| self.no.cancel_order(order_id))
+    }
+
+    /// Snapshot of the YES book — the primary quote the retail UI renders
+    /// (NO is shown as its complement). Use [`MarketBook::snapshot_side`] for NO.
+    pub fn snapshot(&self) -> BookSnapshot {
+        self.yes.snapshot()
+    }
+
+    pub fn snapshot_side(&self, side: Side) -> BookSnapshot {
+        self.side(side).snapshot()
+    }
+}

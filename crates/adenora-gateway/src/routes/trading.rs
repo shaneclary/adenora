@@ -246,9 +246,13 @@ pub async fn place_order(
                 "message": "order queued for next batch auction"
             })))
         }
-        adenora_orderbook::engine::SubmitResult::Executed { order_id, trades } => {
-            // Persist trades and update positions
+        adenora_orderbook::engine::SubmitResult::Executed { order_id, trades, cancelled } => {
+            // Persist fills first, then release funds for anything the engine
+            // dropped (unfilled IOC/FOK, self-trade) using post-fill quantities.
             persist_trades(&state, &trades).await;
+            if !cancelled.is_empty() {
+                release_cancelled_orders(&state, &cancelled).await;
+            }
 
             Ok(Json(json!({
                 "status": "executed",
@@ -262,6 +266,46 @@ pub async fn place_order(
                     "fee": if t.buyer_user_id == auth.user_id { t.buyer_fee.to_string() } else { t.seller_fee.to_string() }
                 })).collect::<Vec<_>>()
             })))
+        }
+    }
+}
+
+/// Release reserved funds and mark cancelled for orders the matching engine
+/// dropped internally (self-trade prevention, unfilled IOC/FOK). Only buys
+/// reserve funds; the unfilled portion is what gets released, computed from the
+/// current `filled_quantity` (so this must run after `persist_trades`).
+pub async fn release_cancelled_orders(state: &AppState, cancelled: &[adenora_common::types::OrderId]) {
+    for order_id in cancelled {
+        let row: Option<(Uuid, i32, i32, i32, String)> = sqlx::query_as(
+            "SELECT user_id, price_cents, quantity, filled_quantity, action
+             FROM orders WHERE id = $1 AND status IN ('pending', 'partial_fill')"
+        )
+        .bind(order_id)
+        .fetch_optional(&state.db)
+        .await
+        .ok()
+        .flatten();
+
+        let Some((user_id, price_cents, quantity, filled, action)) = row else { continue };
+
+        sqlx::query("UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = $1")
+            .bind(order_id)
+            .execute(&state.db)
+            .await
+            .ok();
+
+        let unfilled = quantity - filled;
+        if action == "buy" && unfilled > 0 {
+            let release = Decimal::new(price_cents as i64 * unfilled as i64, 2);
+            sqlx::query(
+                "UPDATE wallets SET reserved = GREATEST(reserved - $1, 0), available = available + $1, updated_at = NOW()
+                 WHERE user_id = $2 AND currency = 'EUR'"
+            )
+            .bind(release)
+            .bind(user_id)
+            .execute(&state.db)
+            .await
+            .ok();
         }
     }
 }

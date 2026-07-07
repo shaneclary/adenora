@@ -16,6 +16,11 @@ pub struct AdenoraConfig {
 pub struct ServerConfig {
     pub bind_addr: SocketAddr,
     pub cors_origins: Vec<String>,
+    /// IPs of trusted reverse proxies (e.g. the front-end load balancer).
+    /// `X-Forwarded-For` is only honored when the direct peer is one of these;
+    /// otherwise the client socket address is used for rate limiting so a client
+    /// cannot spoof the header to escape limits.
+    pub trusted_proxies: Vec<std::net::IpAddr>,
 }
 
 #[derive(Debug, Clone)]
@@ -76,6 +81,11 @@ impl AdenoraConfig {
                     .unwrap_or_else(|_| "*".into())
                     .split(',')
                     .map(|s| s.trim().to_string())
+                    .collect(),
+                trusted_proxies: env::var("ADENORA_TRUSTED_PROXIES")
+                    .unwrap_or_default()
+                    .split(',')
+                    .filter_map(|s| s.trim().parse().ok())
                     .collect(),
             },
             database: DatabaseConfig {

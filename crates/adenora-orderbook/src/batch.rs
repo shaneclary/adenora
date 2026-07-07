@@ -1,5 +1,5 @@
-use crate::book::{Order, OrderBook, Trade};
-use crate::matching;
+use crate::book::{MarketBook, Order};
+use crate::matching::{self, MatchResult};
 use adenora_common::types::*;
 use std::collections::VecDeque;
 use tokio::sync::Mutex;
@@ -16,8 +16,8 @@ use uuid::Uuid;
 pub struct BatchEngine {
     /// Pending orders waiting for the next batch
     queue: Mutex<VecDeque<Order>>,
-    /// The order book
-    book: Mutex<OrderBook>,
+    /// The order books (one per outcome side)
+    book: Mutex<MarketBook>,
     /// Batch interval in milliseconds
     interval_ms: u64,
 }
@@ -26,7 +26,7 @@ impl BatchEngine {
     pub fn new(interval_ms: u64) -> Self {
         Self {
             queue: Mutex::new(VecDeque::new()),
-            book: Mutex::new(OrderBook::new()),
+            book: Mutex::new(MarketBook::new()),
             interval_ms,
         }
     }
@@ -37,6 +37,12 @@ impl BatchEngine {
         let id = order.id;
         self.queue.lock().await.push_back(order);
         id
+    }
+
+    /// Insert a resting order directly into the book without going through a
+    /// batch cycle. Used to rehydrate open orders into the engine on startup.
+    pub async fn rehydrate(&self, order: Order) {
+        self.book.lock().await.submit_order(order);
     }
 
     /// Cancel a pending or resting order.
@@ -57,9 +63,9 @@ impl BatchEngine {
         Some(order)
     }
 
-    /// Execute one batch cycle: drain queue, insert all, match.
-    /// Returns the batch ID and any trades produced.
-    pub async fn execute_batch(&self) -> (BatchId, Vec<Trade>) {
+    /// Execute one batch cycle: drain queue, insert all, match each side.
+    /// Returns the batch ID and the match result (trades + cancelled ids).
+    pub async fn execute_batch(&self) -> (BatchId, MatchResult) {
         let batch_id = Uuid::new_v4();
 
         // Drain all pending orders
@@ -69,42 +75,55 @@ impl BatchEngine {
         };
 
         if orders.is_empty() {
-            return (batch_id, Vec::new());
+            return (batch_id, MatchResult::default());
         }
 
         let mut book = self.book.lock().await;
 
-        // Insert all orders from this batch into the book
-        // They all get the same timestamp (batch time), so within a batch
-        // the order is effectively random — no latency advantage
+        // Insert all orders from this batch into their side's book.
         for order in orders {
-            match order.time_in_force {
-                TimeInForce::Gtc | TimeInForce::Ioc | TimeInForce::Fok => {
-                    book.submit_order(order);
-                }
+            book.submit_order(order);
+        }
+
+        // Run a uniform-price call auction on each outcome side independently —
+        // YES never crosses NO, and within a side all batch orders clear at one
+        // price with no intra-batch time priority.
+        let mut result = MatchResult::default();
+        for side in [Side::Yes, Side::No] {
+            let r = matching::match_auction(book.side_mut(side), MarketMode::People, Some(batch_id));
+            result.trades.extend(r.trades);
+            result.cancelled.extend(r.cancelled);
+        }
+
+        // Remove unfilled IOC/FOK orders (they must not rest) and report them so
+        // their reserved funds get released. GTC orders remain resting.
+        for side in [Side::Yes, Side::No] {
+            let b = book.side_mut(side);
+            for orders in b.bids.levels.values_mut().chain(b.asks.levels.values_mut()) {
+                orders.retain(|o| {
+                    let expires = matches!(o.time_in_force, TimeInForce::Ioc | TimeInForce::Fok)
+                        && !o.is_fully_filled();
+                    if expires {
+                        result.cancelled.push(o.id);
+                    }
+                    !expires
+                });
             }
+            b.bids.levels.retain(|_, orders| !orders.is_empty());
+            b.asks.levels.retain(|_, orders| !orders.is_empty());
         }
 
-        // Match all crossing orders
-        let trades = matching::match_orders(&mut book, MarketMode::People, Some(batch_id));
-
-        // Handle IOC orders that weren't fully filled — cancel remainder
-        for (_price, orders) in book.bids.levels.iter_mut() {
-            orders.retain(|o| o.time_in_force != TimeInForce::Ioc || o.is_fully_filled());
-        }
-        for (_price, orders) in book.asks.levels.iter_mut() {
-            orders.retain(|o| o.time_in_force != TimeInForce::Ioc || o.is_fully_filled());
-        }
-        // Clean up empty price levels
-        book.bids.levels.retain(|_, orders| !orders.is_empty());
-        book.asks.levels.retain(|_, orders| !orders.is_empty());
-
-        (batch_id, trades)
+        (batch_id, result)
     }
 
-    /// Get a snapshot of the current order book.
+    /// Get a snapshot of the current order book (YES side — the primary quote).
     pub async fn snapshot(&self) -> crate::book::BookSnapshot {
         self.book.lock().await.snapshot()
+    }
+
+    /// Snapshot of a specific outcome side.
+    pub async fn snapshot_side(&self, side: Side) -> crate::book::BookSnapshot {
+        self.book.lock().await.snapshot_side(side)
     }
 
     /// Get the batch interval.

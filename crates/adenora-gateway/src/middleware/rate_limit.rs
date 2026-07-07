@@ -1,10 +1,11 @@
 use std::collections::HashMap;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::Mutex;
 
 use axum::{
-    extract::{Request, State},
+    extract::{ConnectInfo, Request, State},
     http::StatusCode,
     middleware::Next,
     response::{IntoResponse, Response},
@@ -23,13 +24,7 @@ pub async fn rate_limit_middleware(
     req: Request,
     next: Next,
 ) -> Response {
-    let ip = req
-        .headers()
-        .get("x-forwarded-for")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|s| s.split(',').next())
-        .map(|s| s.trim().to_string())
-        .unwrap_or_else(|| "unknown".to_string());
+    let ip = client_ip(&state, &req);
 
     match state.rate_limiter.check(&ip).await {
         Ok(_remaining) => next.run(req).await,
@@ -38,6 +33,32 @@ pub async fn rate_limit_middleware(
             "Rate limit exceeded. Please slow down.",
         )
             .into_response(),
+    }
+}
+
+/// Determine the rate-limit key for a request.
+///
+/// Uses the real socket peer address. `X-Forwarded-For` is only trusted when the
+/// direct peer is a configured trusted proxy — otherwise a client could set the
+/// header to a random value per request and get a fresh bucket each time.
+fn client_ip(state: &AppState, req: &Request) -> String {
+    let peer_ip = req
+        .extensions()
+        .get::<ConnectInfo<SocketAddr>>()
+        .map(|ci| ci.0.ip());
+
+    match peer_ip {
+        Some(ip) if state.config.server.trusted_proxies.contains(&ip) => req
+            .headers()
+            .get("x-forwarded-for")
+            .and_then(|v| v.to_str().ok())
+            .and_then(|s| s.split(',').next())
+            .map(|s| s.trim().to_string())
+            .unwrap_or_else(|| ip.to_string()),
+        Some(ip) => ip.to_string(),
+        // No connection info (e.g. in tests) — fall back to a single shared key
+        // rather than trusting a spoofable header.
+        None => "unknown".to_string(),
     }
 }
 
