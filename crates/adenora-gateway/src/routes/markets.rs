@@ -9,10 +9,25 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use uuid::Uuid;
 
+/// Row for the market list query (no resolved outcome column).
+type MarketListRow = (
+    Uuid, String, String, String, Value, String,
+    chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>,
+);
+
+/// Row for a single market including its resolved outcome.
+type MarketDetailRow = (
+    Uuid, String, String, String, Value, String, Option<String>,
+    chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>,
+);
+
 #[derive(Deserialize)]
 pub struct MarketQuery {
     pub status: Option<String>,
+    // Interface scaffolding: retained for planned category/country market filtering.
+    #[allow(dead_code)]
     pub category: Option<String>,
+    #[allow(dead_code)]
     pub country: Option<String>,
     pub limit: Option<i64>,
     pub offset: Option<i64>,
@@ -26,7 +41,7 @@ pub async fn list_markets(
     let offset = q.offset.unwrap_or(0);
     let status = q.status.unwrap_or_else(|| "active".to_string());
 
-    let rows: Vec<(Uuid, String, String, String, Value, String, chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>)> =
+    let rows: Vec<MarketListRow> =
         sqlx::query_as(
             "SELECT id, question, description, category, outcomes, status, opens_at, closes_at
              FROM markets
@@ -75,7 +90,7 @@ pub async fn get_market(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
-    let row: Option<(Uuid, String, String, String, Value, String, Option<String>, chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>)> =
+    let row: Option<MarketDetailRow> =
         sqlx::query_as(
             "SELECT id, question, description, category, outcomes, status, outcome, opens_at, closes_at
              FROM markets WHERE id = $1"

@@ -1,6 +1,8 @@
 /// Input validation and sanitization utilities.
 /// Prevents XSS, SQL injection, and other OWASP top 10 attacks.
 /// Sanitize a user-provided string: strip HTML tags, limit length.
+// Interface scaffolding: retained for planned input-sanitization wiring.
+#[allow(dead_code)]
 pub fn sanitize_text(input: &str, max_len: usize) -> String {
     input
         .chars()
@@ -62,6 +64,8 @@ pub fn is_valid_display_name(name: &str) -> Result<(), &'static str> {
 }
 
 /// Validate ISO 3166-1 alpha-2 country code for supported countries.
+// Interface scaffolding: retained for planned country-validation wiring.
+#[allow(dead_code)]
 pub fn is_supported_country(code: &str) -> bool {
     matches!(
         code,
@@ -71,13 +75,17 @@ pub fn is_supported_country(code: &str) -> bool {
 }
 
 /// Validate a prediction price (1-99 cents).
+// Interface scaffolding: retained for planned price-validation wiring.
+#[allow(dead_code)]
 pub fn is_valid_price(cents: u32) -> bool {
-    cents >= 1 && cents <= 99
+    (1..=99).contains(&cents)
 }
 
 /// Validate quantity (1-10000).
+// Interface scaffolding: retained for planned quantity-validation wiring.
+#[allow(dead_code)]
 pub fn is_valid_quantity(qty: u32) -> bool {
-    qty >= 1 && qty <= 10_000
+    (1..=10_000).contains(&qty)
 }
 
 #[cfg(test)]

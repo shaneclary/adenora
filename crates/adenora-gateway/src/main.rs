@@ -177,7 +177,13 @@ async fn rehydrate_open_orders(state: &state::AppState) {
     use adenora_orderbook::book::Order;
     use uuid::Uuid;
 
-    let rows: Vec<(Uuid, Uuid, Uuid, String, String, i32, i32, i32, String, Option<Uuid>, chrono::DateTime<chrono::Utc>)> =
+    /// Row for an open order rehydrated from the database on startup.
+    type OpenOrderRow = (
+        Uuid, Uuid, Uuid, String, String, i32, i32, i32, String, Option<Uuid>,
+        chrono::DateTime<chrono::Utc>,
+    );
+
+    let rows: Vec<OpenOrderRow> =
         sqlx::query_as(
             "SELECT o.id, o.user_id, o.market_id, o.side, o.action, o.price_cents,
                     o.quantity, o.filled_quantity, o.mode, o.bot_id, o.created_at

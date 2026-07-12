@@ -1,3 +1,8 @@
+// Interface scaffolding: the Veriff KYC provider interface (request/webhook DTOs
+// and helpers) is retained for a planned verification integration; several fields
+// are deserialized from the provider but not yet consumed.
+#![allow(dead_code)]
+
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 

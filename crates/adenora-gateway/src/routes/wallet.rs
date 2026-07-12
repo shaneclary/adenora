@@ -5,6 +5,15 @@ use rust_decimal::Decimal;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
+/// A user's self-exclusion / cooling-off timestamps and deposit limits.
+type UserLimitsRow = (
+    Option<chrono::DateTime<chrono::Utc>>, // self_exclusion_until
+    Option<chrono::DateTime<chrono::Utc>>, // cooling_off_until
+    Option<Decimal>,                       // daily_deposit_limit
+    Option<Decimal>,                       // weekly_deposit_limit
+    Option<Decimal>,                       // monthly_deposit_limit
+);
+
 #[derive(Deserialize)]
 pub struct DepositRequest {
     pub currency: String,
@@ -69,13 +78,7 @@ pub async fn deposit(
     let mut tx = state.db.begin().await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
 
-    let user: Option<(
-        Option<chrono::DateTime<chrono::Utc>>, // self_exclusion_until
-        Option<chrono::DateTime<chrono::Utc>>, // cooling_off_until
-        Option<Decimal>,                       // daily_deposit_limit
-        Option<Decimal>,                       // weekly_deposit_limit
-        Option<Decimal>,                       // monthly_deposit_limit
-    )> = sqlx::query_as(
+    let user: Option<UserLimitsRow> = sqlx::query_as(
         "SELECT self_exclusion_until, cooling_off_until,
                 daily_deposit_limit, weekly_deposit_limit, monthly_deposit_limit
          FROM users WHERE id = $1 FOR UPDATE"

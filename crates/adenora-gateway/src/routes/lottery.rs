@@ -15,10 +15,22 @@ pub struct BuyTicketRequest {
     pub numbers: Vec<i32>,
 }
 
+/// Row for the lottery list query.
+type LotteryListRow = (Uuid, String, String, String, Decimal, String, String, i32);
+
+/// Row for a single lottery's pricing/split config.
+type LotteryConfigRow = (Uuid, Decimal, String, Uuid, i32, i32, i32, String);
+
+/// Row for a lottery draw record.
+type LotteryDrawRow = (
+    Uuid, i32, chrono::DateTime<chrono::Utc>,
+    Option<chrono::DateTime<chrono::Utc>>, Option<Vec<i32>>, Decimal, String,
+);
+
 pub async fn list_lotteries(
     State(state): State<AppState>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
-    let rows: Vec<(Uuid, String, String, String, Decimal, String, String, i32)> =
+    let rows: Vec<LotteryListRow> =
         sqlx::query_as(
             "SELECT id, name, description, game_type, ticket_price, currency, status, prize_pct
              FROM lotteries WHERE status = 'active' ORDER BY name"
@@ -63,7 +75,7 @@ pub async fn buy_ticket(
         }
     }
 
-    let lottery: Option<(Uuid, Decimal, String, Uuid, i32, i32, i32, String)> = sqlx::query_as(
+    let lottery: Option<LotteryConfigRow> = sqlx::query_as(
         "SELECT id, ticket_price, currency, project_id, prize_pct, project_pct, company_pct, game_type
          FROM lotteries WHERE id = $1 AND status = 'active'"
     )
@@ -220,7 +232,7 @@ pub async fn list_draws(
     State(state): State<AppState>,
     Path(lottery_id): Path<Uuid>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
-    let rows: Vec<(Uuid, i32, chrono::DateTime<chrono::Utc>, Option<chrono::DateTime<chrono::Utc>>, Option<Vec<i32>>, Decimal, String)> =
+    let rows: Vec<LotteryDrawRow> =
         sqlx::query_as(
             "SELECT id, draw_number, scheduled_at, executed_at, winning_numbers, prize_pool, status
              FROM draws WHERE lottery_id = $1 ORDER BY draw_number DESC LIMIT 50"

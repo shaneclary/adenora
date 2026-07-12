@@ -1,3 +1,7 @@
+// Interface scaffolding: this whole geofencing module is retained for a planned
+// per-market/lottery country-restriction feature and is not yet wired into routes.
+#![allow(dead_code)]
+
 use axum::http::HeaderMap;
 
 /// Determine user's country from request headers.

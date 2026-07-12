@@ -16,13 +16,46 @@ fn err(s: StatusCode, msg: &str) -> (StatusCode, Json<Value>) {
     (s, Json(json!({"error": msg})))
 }
 
+/// Core columns for a campaign list entry.
+type CampaignListRow = (
+    Uuid, String, String, String, String,
+    Decimal, String, Decimal, i32, String, bool,
+);
+
+/// Extra columns fetched per campaign in the list view.
+type CampaignListExtrasRow = (
+    Option<String>, Option<String>, Option<String>,
+    Option<String>, Option<String>, Option<chrono::DateTime<chrono::Utc>>,
+);
+
+/// Core columns for a single campaign detail (includes description).
+type CampaignDetailRow = (
+    Uuid, String, String, String, String, String,
+    Decimal, String, Decimal, i32, String, bool,
+);
+
+/// Extra columns for a single campaign detail.
+type CampaignDetailExtrasRow = (
+    Option<String>, Option<String>, Option<String>, Option<String>,
+    Option<String>, Option<String>,
+    Option<chrono::DateTime<chrono::Utc>>, Option<chrono::DateTime<chrono::Utc>>,
+);
+
+/// Row for a campaign update entry.
+type CampaignUpdateRow = (
+    Uuid, String, String, Option<String>, Option<i32>, String,
+    chrono::DateTime<chrono::Utc>,
+);
+
+/// Row for a campaign donor-wall entry.
+type CampaignDonorRow = (
+    String, Decimal, Option<String>, String, chrono::DateTime<chrono::Utc>,
+);
+
 /// GET /api/v1/campaigns — list active cause campaigns
 pub async fn list_campaigns(State(state): State<AppState>) -> ApiResult {
     // Split into two queries to stay within sqlx 16-column tuple limit
-    let rows: Vec<(
-        Uuid, String, String, String, String,
-        Decimal, String, Decimal, i32, String, bool,
-    )> = sqlx::query_as(
+    let rows: Vec<CampaignListRow> = sqlx::query_as(
         "SELECT id, slug, title, tagline, category,
                 goal_amount, currency, amount_raised, donor_count,
                 status, is_featured
@@ -37,10 +70,7 @@ pub async fn list_campaigns(State(state): State<AppState>) -> ApiResult {
     let mut campaigns: Vec<Value> = Vec::with_capacity(rows.len());
     for (id, slug, title, tagline, category, goal, currency, raised, donors, status, featured) in rows {
         // Fetch the extra fields separately
-        let extras: Option<(
-            Option<String>, Option<String>, Option<String>,
-            Option<String>, Option<String>, Option<chrono::DateTime<chrono::Utc>>,
-        )> = sqlx::query_as(
+        let extras: Option<CampaignListExtrasRow> = sqlx::query_as(
             "SELECT hero_image_url, impact_metric, impact_value,
                     location, partner_org, ends_at
              FROM cause_campaigns WHERE id = $1"
@@ -78,10 +108,7 @@ pub async fn get_campaign(
     Path(slug): Path<String>,
 ) -> ApiResult {
     // Core fields (≤16 cols)
-    let core: Option<(
-        Uuid, String, String, String, String, String,
-        Decimal, String, Decimal, i32, String, bool,
-    )> = sqlx::query_as(
+    let core: Option<CampaignDetailRow> = sqlx::query_as(
         "SELECT id, slug, title, tagline, category, description,
                 goal_amount, currency, amount_raised, donor_count,
                 status, is_featured
@@ -96,11 +123,7 @@ pub async fn get_campaign(
         core.ok_or_else(|| err(StatusCode::NOT_FOUND, "campaign not found"))?;
 
     // Extra fields
-    let extras: Option<(
-        Option<String>, Option<String>, Option<String>, Option<String>,
-        Option<String>, Option<String>,
-        Option<chrono::DateTime<chrono::Utc>>, Option<chrono::DateTime<chrono::Utc>>,
-    )> = sqlx::query_as(
+    let extras: Option<CampaignDetailExtrasRow> = sqlx::query_as(
         "SELECT hero_image_url, impact_metric, impact_value, location,
                 partner_org, partner_url, ends_at, funded_at
          FROM cause_campaigns WHERE id = $1"
@@ -119,7 +142,7 @@ pub async fn get_campaign(
     } else { Decimal::ZERO };
 
     // Updates
-    let updates: Vec<(Uuid, String, String, Option<String>, Option<i32>, String, chrono::DateTime<chrono::Utc>)> =
+    let updates: Vec<CampaignUpdateRow> =
         sqlx::query_as(
             "SELECT id, title, body, image_url, milestone_pct, author, published_at
              FROM campaign_updates WHERE campaign_id = $1
@@ -402,7 +425,7 @@ pub async fn get_donors(
     let id = campaign_id
         .ok_or_else(|| err(StatusCode::NOT_FOUND, "campaign not found"))?.0;
 
-    let wall: Vec<(String, Decimal, Option<String>, String, chrono::DateTime<chrono::Utc>)> =
+    let wall: Vec<CampaignDonorRow> =
         sqlx::query_as(
             "SELECT display_name, total_given, message, badge, last_donated_at
              FROM donor_wall WHERE campaign_id = $1 AND is_visible = true

@@ -92,6 +92,8 @@ impl RateLimiter {
     }
 
     /// Bot mode: effectively unlimited (10000 req/min).
+    // Interface scaffolding: retained for planned bot-lane rate limiting.
+    #[allow(dead_code)]
     pub fn bot_unlimited() -> Self {
         Self::new(10_000, 167.0)
     }
@@ -120,6 +122,8 @@ impl RateLimiter {
     }
 
     /// Periodic cleanup of stale buckets.
+    // Interface scaffolding: retained for a planned periodic bucket-cleanup task.
+    #[allow(dead_code)]
     pub async fn cleanup(&self) {
         let mut buckets = self.buckets.lock().await;
         let now = Instant::now();

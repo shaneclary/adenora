@@ -17,6 +17,24 @@ use uuid::Uuid;
 
 // ─── Simplified predict endpoint ────────────────────────────────────────────
 
+/// Row for a single market with its linked charity project.
+type MarketWithCharityRow = (
+    Uuid, String, String, String, String,
+    chrono::DateTime<Utc>, Option<Uuid>, Option<String>, Option<String>,
+);
+
+/// Row for a market listing in the predict feed.
+type PredictMarketRow = (
+    Uuid, String, String, String,
+    chrono::DateTime<Utc>, Option<String>,
+);
+
+/// Row for a user's prediction position.
+type PredictPositionRow = (
+    Uuid, Uuid, String, String, i32, Decimal, String,
+    chrono::DateTime<Utc>, String, Option<String>,
+);
+
 #[derive(Deserialize)]
 pub struct PredictRequest {
     pub market_id: Uuid,
@@ -106,7 +124,7 @@ pub async fn predict(
     };
 
     // Clamp to valid range
-    let price_cents = price_cents.max(1).min(99);
+    let price_cents = price_cents.clamp(1, 99);
     let price_dollars = Decimal::new(price_cents as i64, 2);
 
     // Calculate contracts from euro amount
@@ -262,10 +280,7 @@ pub async fn get_market_card(
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
     let err = |s: StatusCode, m: &str| (s, Json(json!({"error": m})));
 
-    let market: Option<(
-        Uuid, String, String, String, String,
-        chrono::DateTime<Utc>, Option<Uuid>, Option<String>, Option<String>,
-    )> = sqlx::query_as(
+    let market: Option<MarketWithCharityRow> = sqlx::query_as(
         "SELECT m.id, m.question, m.description, m.category, m.status,
                 m.closes_at, m.charity_project_id, cp.name, cp.category
          FROM markets m
@@ -367,10 +382,7 @@ pub async fn list_market_cards(
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
     let err = |s: StatusCode, m: &str| (s, Json(json!({"error": m})));
 
-    let markets: Vec<(
-        Uuid, String, String, String,
-        chrono::DateTime<Utc>, Option<String>,
-    )> = sqlx::query_as(
+    let markets: Vec<PredictMarketRow> = sqlx::query_as(
         "SELECT m.id, m.question, m.category, m.status,
                 m.closes_at, cp.name
          FROM markets m
@@ -422,10 +434,7 @@ pub async fn get_predictions(
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
     let err = |s: StatusCode, m: &str| (s, Json(json!({"error": m})));
 
-    let rows: Vec<(
-        Uuid, Uuid, String, String, i32, Decimal, String,
-        chrono::DateTime<Utc>, String, Option<String>,
-    )> = sqlx::query_as(
+    let rows: Vec<PredictPositionRow> = sqlx::query_as(
         "SELECT p.id, p.market_id, m.question, p.side, p.quantity, p.avg_price, p.mode,
                 m.closes_at, m.status, cp.name
          FROM positions p

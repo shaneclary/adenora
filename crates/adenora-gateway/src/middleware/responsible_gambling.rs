@@ -1,17 +1,21 @@
+// Interface scaffolding: the responsible-gambling enforcement helpers below are
+// retained for a planned pre-activity restriction check and are not yet wired in.
+#![allow(dead_code)]
+
 use chrono::{DateTime, Duration, Utc};
 use rust_decimal::Decimal;
 use sqlx::PgPool;
 use uuid::Uuid;
+
+/// Row of (self_exclusion_until, cooling_off_until) as fetched from `users`.
+type RestrictionRow = (Option<DateTime<Utc>>, Option<DateTime<Utc>>);
 
 /// Check all responsible gambling restrictions for a user before allowing activity.
 pub async fn check_gambling_restrictions(
     db: &PgPool,
     user_id: Uuid,
 ) -> Result<(), GamblingRestriction> {
-    let row: Option<(
-        Option<DateTime<Utc>>,  // self_exclusion_until
-        Option<DateTime<Utc>>,  // cooling_off_until
-    )> = sqlx::query_as(
+    let row: Option<RestrictionRow> = sqlx::query_as(
         "SELECT self_exclusion_until, cooling_off_until FROM users WHERE id = $1"
     )
     .bind(user_id)

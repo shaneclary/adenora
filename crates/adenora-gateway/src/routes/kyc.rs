@@ -114,6 +114,8 @@ pub async fn kyc_status(
 #[derive(Deserialize)]
 pub struct StartKycRequest {
     pub locale: String,
+    // Interface scaffolding: retained for the planned Veriff session-start payload.
+    #[allow(dead_code)]
     pub document_country: String,
 }
 

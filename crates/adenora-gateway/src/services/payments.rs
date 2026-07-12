@@ -1,3 +1,9 @@
+// Payment-provider interface scaffolding. The destination validators
+// (`is_valid_iban`, `is_valid_eth_address`) are wired into the withdraw path;
+// the payment-intent DTOs and constructors are retained for the planned SEPA/
+// card/crypto rail integration and are not yet called.
+#![allow(dead_code)]
+
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;

@@ -3,6 +3,12 @@ use axum::{Json, extract::State, http::StatusCode};
 use serde_json::{json, Value};
 use uuid::Uuid;
 
+/// Row for a charity ledger entry.
+type CharityLedgerRow = (
+    Uuid, Uuid, String, rust_decimal::Decimal, String, String,
+    chrono::DateTime<chrono::Utc>,
+);
+
 pub async fn list_projects(
     State(state): State<AppState>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
@@ -37,7 +43,7 @@ pub async fn list_projects(
 pub async fn get_ledger(
     State(state): State<AppState>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
-    let rows: Vec<(Uuid, Uuid, String, rust_decimal::Decimal, String, String, chrono::DateTime<chrono::Utc>)> =
+    let rows: Vec<CharityLedgerRow> =
         sqlx::query_as(
             "SELECT cl.id, cl.project_id, cl.source, cl.amount, cl.currency, cl.description, cl.created_at
              FROM charity_ledger cl

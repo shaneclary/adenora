@@ -17,6 +17,8 @@ enum WsCommand {
     /// Subscribe to a market's order book updates
     Subscribe {
         market_id: Uuid,
+        // Interface scaffolding: retained for planned people/bot book selection.
+        #[allow(dead_code)]
         mode: Option<String>, // "people", "bot", or "both" (default)
     },
     /// Unsubscribe from a market

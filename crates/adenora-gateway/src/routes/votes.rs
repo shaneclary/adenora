@@ -15,15 +15,29 @@ fn err(s: StatusCode, msg: &str) -> (StatusCode, Json<Value>) {
     (s, Json(json!({"error": msg})))
 }
 
+/// Row for a vote campaign list entry.
+type VoteCampaignRow = (
+    Uuid, String, String, String, String, String, i32,
+    Decimal, String, String,
+    chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>,
+);
+
+/// Row for a single vote campaign's core fields (incl. winning proposal).
+type VoteCampaignCoreRow = (
+    Uuid, String, String, String, String, String, i32,
+    Decimal, String, String,
+    chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>,
+    Option<Uuid>,
+);
+
+/// Row for a vote proposal with tallies.
+type VoteProposalRow = (Uuid, String, String, Option<String>, i32, Decimal, i32);
+
 // ─── List vote campaigns ────────────────────────────────────────────────────
 
 /// GET /api/v1/votes — list active vote campaigns
 pub async fn list_campaigns(State(state): State<AppState>) -> ApiResult {
-    let rows: Vec<(
-        Uuid, String, String, String, String, String, i32,
-        Decimal, String, String,
-        chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>,
-    )> = sqlx::query_as(
+    let rows: Vec<VoteCampaignRow> = sqlx::query_as(
         "SELECT id, title, description, category, vote_mode, fund_mode, vote_cap,
                 seed_amount, currency, status, opens_at, closes_at
          FROM vote_campaigns
@@ -62,12 +76,7 @@ pub async fn get_campaign(
     Path(id): Path<Uuid>,
 ) -> ApiResult {
     // Split into two queries to stay within sqlx 16-column tuple limit
-    let core: Option<(
-        Uuid, String, String, String, String, String, i32,
-        Decimal, String, String,
-        chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>,
-        Option<Uuid>,
-    )> = sqlx::query_as(
+    let core: Option<VoteCampaignCoreRow> = sqlx::query_as(
         "SELECT id, title, description, category, vote_mode, fund_mode, vote_cap,
                 seed_amount, currency, status, opens_at, closes_at, winning_proposal_id
          FROM vote_campaigns WHERE id = $1"
@@ -97,7 +106,7 @@ pub async fn get_campaign(
         extras.unwrap_or((60, 20, 20, None));
 
     // Get proposals with tallies
-    let proposals: Vec<(Uuid, String, String, Option<String>, i32, Decimal, i32)> = sqlx::query_as(
+    let proposals: Vec<VoteProposalRow> = sqlx::query_as(
         "SELECT id, title, description, image_url, vote_count, fund_total, voter_count
          FROM vote_proposals WHERE campaign_id = $1
          ORDER BY vote_count DESC, fund_total DESC"

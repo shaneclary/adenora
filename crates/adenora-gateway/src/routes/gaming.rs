@@ -6,6 +6,12 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use uuid::Uuid;
 
+/// Row for a tournament listing.
+type TournamentRow = (
+    Uuid, String, rust_decimal::Decimal, rust_decimal::Decimal, i32, i32, String,
+    chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>,
+);
+
 pub async fn list_games(
     State(state): State<AppState>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
@@ -29,7 +35,7 @@ pub async fn list_games(
 pub async fn list_tournaments(
     State(state): State<AppState>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
-    let rows: Vec<(Uuid, String, rust_decimal::Decimal, rust_decimal::Decimal, i32, i32, String, chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>)> =
+    let rows: Vec<TournamentRow> =
         sqlx::query_as(
             "SELECT id, name, entry_fee, prize_pool, max_participants, current_participants, status, starts_at, ends_at
              FROM tournaments WHERE status IN ('registration', 'in_progress')

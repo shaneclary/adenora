@@ -10,6 +10,21 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use uuid::Uuid;
 
+/// Row for the bot leaderboard/list query.
+type BotListRow = (Uuid, String, Option<String>, String, i64, Decimal, f64);
+
+/// Row for a single bot's full detail (stats + record).
+type BotDetailRow = (
+    Uuid, String, Option<String>, bool, String, i64, Decimal, Decimal,
+    f64, f64, f64, i32, i32, i32,
+);
+
+/// Row for a bot tournament listing.
+type BotTournamentRow = (
+    Uuid, String, Decimal, Decimal, i32, String,
+    chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>,
+);
+
 #[derive(Deserialize)]
 pub struct RegisterBotRequest {
     pub name: String,
@@ -21,7 +36,7 @@ pub struct RegisterBotRequest {
 pub async fn list_bots(
     State(state): State<AppState>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
-    let rows: Vec<(Uuid, String, Option<String>, String, i64, Decimal, f64)> =
+    let rows: Vec<BotListRow> =
         sqlx::query_as(
             "SELECT id, name, description, status, total_trades, total_pnl, win_rate
              FROM bots WHERE status = 'active' ORDER BY total_pnl DESC LIMIT 100"
@@ -98,7 +113,7 @@ pub async fn get_bot(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
-    let row: Option<(Uuid, String, Option<String>, bool, String, i64, Decimal, Decimal, f64, f64, f64, i32, i32, i32)> =
+    let row: Option<BotDetailRow> =
         sqlx::query_as(
             "SELECT id, name, description, is_open_source, status,
                     total_trades, total_volume, total_pnl, win_rate, sharpe_ratio, max_drawdown,
@@ -146,7 +161,7 @@ pub async fn bot_leaderboard(
 pub async fn list_bot_tournaments(
     State(state): State<AppState>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
-    let rows: Vec<(Uuid, String, Decimal, Decimal, i32, String, chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>)> =
+    let rows: Vec<BotTournamentRow> =
         sqlx::query_as(
             "SELECT id, name, entry_fee, prize_pool, max_bots, status, starts_at, ends_at
              FROM bot_tournaments ORDER BY starts_at DESC LIMIT 20"
