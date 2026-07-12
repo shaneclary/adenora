@@ -50,5 +50,5 @@ pub fn build_donation(
 /// Check if a campaign is still accepting donations.
 pub fn is_accepting(campaign: &CauseCampaign) -> bool {
     matches!(campaign.status, CampaignStatus::Active)
-        && campaign.ends_at.map_or(true, |end| end > Utc::now())
+        && campaign.ends_at.is_none_or(|end| end > Utc::now())
 }

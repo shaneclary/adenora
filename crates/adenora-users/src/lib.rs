@@ -41,7 +41,7 @@ pub enum KycStatus {
     Rejected,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct GamblingLimits {
     pub daily_deposit_limit: Option<Decimal>,
     pub weekly_deposit_limit: Option<Decimal>,
@@ -49,19 +49,6 @@ pub struct GamblingLimits {
     pub self_exclusion_until: Option<DateTime<Utc>>,
     pub cooling_off_until: Option<DateTime<Utc>>,
     pub loss_alert_threshold: Option<Decimal>,
-}
-
-impl Default for GamblingLimits {
-    fn default() -> Self {
-        Self {
-            daily_deposit_limit: None,
-            weekly_deposit_limit: None,
-            monthly_deposit_limit: None,
-            self_exclusion_until: None,
-            cooling_off_until: None,
-            loss_alert_threshold: None,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

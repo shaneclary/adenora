@@ -59,9 +59,9 @@ pub fn generate_card(config: &ScratchConfig) -> ScratchCard {
         }
     } else {
         // No win — random symbols, ensuring no prize pattern
-        for r in 0..rows {
-            for c in 0..cols {
-                grid[r][c] = config.symbols[rng.gen_range(0..config.symbols.len())].clone();
+        for row in grid.iter_mut() {
+            for cell in row.iter_mut() {
+                *cell = config.symbols[rng.gen_range(0..config.symbols.len())].clone();
             }
         }
     }
