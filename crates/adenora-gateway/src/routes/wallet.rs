@@ -172,21 +172,30 @@ pub async fn withdraw(
     auth: AuthUser,
     Json(body): Json<WithdrawRequest>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    use crate::services::payments;
+
     if body.amount <= Decimal::ZERO {
         return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "amount must be positive"}))));
     }
 
-    // Check self-exclusion
-    let _exclusion: Option<(Option<chrono::DateTime<chrono::Utc>>,)> = sqlx::query_as(
-        "SELECT self_exclusion_until FROM users WHERE id = $1"
-    )
-    .bind(auth.user_id)
-    .fetch_optional(&state.db)
-    .await
-    .ok()
-    .flatten();
+    // Only accept currencies the platform supports.
+    if adenora_common::currency::Currency::from_code(&body.currency).is_none() {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "unsupported currency"}))));
+    }
 
-    // Withdrawals are always allowed even during self-exclusion (player protection)
+    // Validate the payout destination for the chosen rail so funds aren't debited
+    // toward a malformed IBAN or crypto address.
+    let method = body.method.to_lowercase();
+    let destination_ok = if method.contains("crypto") || method.contains("usdc") || method.contains("eth") {
+        payments::is_valid_eth_address(&body.destination)
+    } else {
+        payments::is_valid_iban(&body.destination)
+    };
+    if !destination_ok {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": "invalid withdrawal destination"}))));
+    }
+
+    // Withdrawals are always allowed even during self-exclusion (player protection).
 
     let result = sqlx::query(
         "UPDATE wallets SET available = available - $3, updated_at = NOW()

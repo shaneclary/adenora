@@ -12,6 +12,12 @@ pub struct ContinuousEngine {
     book: Mutex<MarketBook>,
 }
 
+impl Default for ContinuousEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ContinuousEngine {
     pub fn new() -> Self {
         Self {

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Locale {
     /// Albanian (Latin script) — Kosovo, Albania, North Macedonia
@@ -11,6 +11,7 @@ pub enum Locale {
     /// Serbian (Latin + Cyrillic) — Serbia, Kosovo minorities
     Sr,
     /// English — international, admin, diaspora
+    #[default]
     En,
     /// Turkish — Kosovo/NMK minorities
     Tr,
@@ -130,12 +131,6 @@ pub enum Script {
     Khmer,
     Lao,
     Han,
-}
-
-impl Default for Locale {
-    fn default() -> Self {
-        Self::En
-    }
 }
 
 /// Translation dictionary: key -> translated string.

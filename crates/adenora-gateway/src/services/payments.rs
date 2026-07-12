@@ -93,13 +93,50 @@ pub fn create_withdrawal(
     }
 }
 
-/// Validate IBAN format (basic check for SEPA).
+/// Validate an IBAN: structural checks plus the ISO 13616 / ISO 7064 mod-97
+/// checksum, so a structurally-plausible but invalid account number is rejected.
 pub fn is_valid_iban(iban: &str) -> bool {
-    let cleaned: String = iban.chars().filter(|c| !c.is_whitespace()).collect();
-    cleaned.len() >= 15
-        && cleaned.len() <= 34
-        && cleaned[..2].chars().all(|c| c.is_ascii_uppercase())
-        && cleaned[2..4].chars().all(|c| c.is_ascii_digit())
+    let cleaned: String = iban
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .map(|c| c.to_ascii_uppercase())
+        .collect();
+
+    if cleaned.len() < 15 || cleaned.len() > 34 {
+        return false;
+    }
+    if !cleaned.is_char_boundary(4) {
+        return false;
+    }
+    let (prefix, rest) = cleaned.split_at(4);
+    if !prefix[..2].chars().all(|c| c.is_ascii_uppercase())
+        || !prefix[2..].chars().all(|c| c.is_ascii_digit())
+    {
+        return false;
+    }
+    if !rest.chars().all(|c| c.is_ascii_alphanumeric()) {
+        return false;
+    }
+
+    // Rearrange (move the first four chars to the end), map letters A..Z to
+    // 10..35, then check the whole number is congruent to 1 modulo 97 — computed
+    // digit-by-digit to avoid big integers.
+    let rearranged = format!("{rest}{prefix}");
+    let mut remainder: u32 = 0;
+    for ch in rearranged.chars() {
+        let value = if ch.is_ascii_digit() {
+            ch as u32 - '0' as u32
+        } else {
+            ch as u32 - 'A' as u32 + 10
+        };
+        // Fold in one or two decimal digits at a time.
+        if value >= 10 {
+            remainder = (remainder * 100 + value) % 97;
+        } else {
+            remainder = (remainder * 10 + value) % 97;
+        }
+    }
+    remainder == 1
 }
 
 /// Validate Ethereum/Polygon address format.

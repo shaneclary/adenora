@@ -143,7 +143,7 @@ impl OrderBook {
 
     pub fn best_bid(&self) -> Option<u32> {
         // Highest bid price
-        self.bids.levels.keys().rev().next().copied()
+        self.bids.levels.keys().next_back().copied()
     }
 
     pub fn best_ask(&self) -> Option<u32> {

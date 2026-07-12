@@ -19,6 +19,9 @@ pub struct MatchResult {
 ///
 /// Both orders in any match are on the same side (YES or NO) because the book
 /// this operates on holds a single outcome side — YES and NO never cross here.
+// The matching loop has two independent exit points (best bid and best ask),
+// so it cannot be expressed as a single `while let`.
+#[allow(clippy::while_let_loop)]
 pub fn match_orders(
     book: &mut OrderBook,
     mode: MarketMode,
@@ -157,6 +160,7 @@ pub fn match_orders(
 /// The clearing price maximizes matched volume; ties are broken toward the
 /// midpoint of the volume-maximizing range. Orders are still filled in
 /// price-then-FIFO order for rationing when supply and demand are unequal.
+#[allow(clippy::while_let_loop)]
 pub fn match_auction(
     book: &mut OrderBook,
     mode: MarketMode,
